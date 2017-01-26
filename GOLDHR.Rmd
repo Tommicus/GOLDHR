@@ -13,6 +13,22 @@ knitr::opts_chunk$set(echo = TRUE)
 source("library.R")
 ```
 
+```{r echo=FALSE, message=FALSE}
+suppressWarnings(source("library.R"))
+# Package options
+suppressWarnings(ggthemr('fresh'))  # ggplot theme
+opts_knit$set(progress=FALSE, verbose=FALSE)
+opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
+options(knitr.kable.NA = '')
+ 
+Datafile = "data/HR_comma_sep.csv"
+```
+ 
+```{r}
+ProjectData <- read.csv(Datafile)
+ProjectData <- data.matrix(ProjectData)
+ProjectData_INITIAL <- ProjectData
+```
 
 ## Objectives of the project
 
@@ -25,6 +41,22 @@ https://www.kaggle.com/ludobenistant/hr-analytics
 ```{r echo=FALSE}
 local_directory <- getwd()
 ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
+```
+
+Let's visualize the sample data for 10 employees
+
+```{r echo=FALSE}
+# let's visualize the sample data for 10 employees
+
+ProjectData1 <- ProjectData[,1:18]
+
+ProjectData1 = data.matrix(ProjectData1)
+```
+
+```{r echo=FALSE}
+max_data_report <- 10
+
+knitr::kable(round(head(ProjectData1, max_data_report), 2))
 ```
 
 ## Descriptive statistics
@@ -40,24 +72,33 @@ my_summary <- function(thedata){
   t(res)
 }
 
-ProjectData1 <- ProjectData[,1:6]
+ProjectData1 <- ProjectData[,1:18]
 
 knitr::kable(round(my_summary(ProjectData1), 2))
 
 ```
 
-We need to scale the data
+We need to scale the data (excluding dummy variables for the department)
 
 ```{r, echo=FALSE, tidy=TRUE}
-ProjectData1_scaled=apply(ProjectData1,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+ProjectData2 <- ProjectData[,1:9]
+ProjectData2_scaled=apply(ProjectData2,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
 ```
 
-Notice now the summary statistics of the scaled dataset:
+Notice now the summary statistics of the scaled dataset (excluding dummy variables for the department):
 
 ```{r echo=FALSE}
-knitr::kable(round(my_summary(ProjectData1_scaled),2))
+ProjectData2 <- ProjectData[,1:9]
+knitr::kable(round(my_summary(ProjectData2_scaled),2))
 ```
 
+Let's see how these are correlated. The correlation matrix is as follows:
+
+```{r}
+show_data = round(cor(ProjectData1),2)
+
+knitr::kable(show_data)
+```
 
 ## Dimensionability reduction *(second priority)*
 
