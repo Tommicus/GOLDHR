@@ -10,7 +10,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r echo=FALSE, message=FALSE}
-source("../INSEADAnalytics/AnalyticsLibraries/library.R")
+source("library.R")
 ```
 
 
@@ -22,14 +22,16 @@ Load the data from Kaggle.com regarding HR analytics in a major US company
 
 https://www.kaggle.com/ludobenistant/hr-analytics
 
-```{r echo=FALSE eval=TRUE}
+```{r echo=FALSE}
 local_directory <- getwd()
 ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
 ```
 
-## Descritptive statistics
+## Descriptive statistics
 
-```{r}
+We show the descriptive statistics of the factors
+
+```{r echo=FALSE}
 my_summary <- function(thedata){
   res = apply(thedata, 2, function(r) c(min(r), quantile(r, 0.25), quantile(r, 0.5), mean(r), quantile(r, 0.75), max(r), sd(r)))
   res <- round(res,2)
@@ -41,11 +43,19 @@ my_summary <- function(thedata){
 ProjectData1 <- ProjectData[,1:6]
 
 knitr::kable(round(my_summary(ProjectData1), 2))
+
 ```
 
-```{r}
-renderFormattable(dformat(head(ProjectData, SAMPLE_ROWS)))
+We need to scale the data
 
+```{r, echo=FALSE, tidy=TRUE}
+ProjectData1_scaled=apply(ProjectData1,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+```
+
+Notice now the summary statistics of the scaled dataset:
+
+```{r echo=FALSE}
+knitr::kable(round(my_summary(ProjectData1_scaled),2))
 ```
 
 
