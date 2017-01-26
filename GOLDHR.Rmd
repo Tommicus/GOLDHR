@@ -9,18 +9,53 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
-
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
-
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
-
-```{r cars}
-summary(cars)
+```{r echo=FALSE, message=FALSE}
+source("../INSEADAnalytics/AnalyticsLibraries/library.R")
 ```
 
-## Including Plots
 
+## Objectives of the project
+
+
+## Data set
+Load the data from Kaggle.com regarding HR analytics in a major US company
+
+https://www.kaggle.com/ludobenistant/hr-analytics
+
+```{r echo=FALSE eval=TRUE}
+local_directory <- getwd()
+ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
+```
+
+## Descritptive statistics
+
+```{r}
+my_summary <- function(thedata){
+  res = apply(thedata, 2, function(r) c(min(r), quantile(r, 0.25), quantile(r, 0.5), mean(r), quantile(r, 0.75), max(r), sd(r)))
+  res <- round(res,2)
+  colnames(res) <- colnames(thedata)
+  rownames(res) <- c("min", "25 percent", "median", "mean", "75 percent", "max", "std")
+  t(res)
+}
+
+ProjectData1 <- ProjectData[,1:6]
+
+knitr::kable(round(my_summary(ProjectData1), 2))
+```
+
+```{r}
+renderFormattable(dformat(head(ProjectData, SAMPLE_ROWS)))
+
+```
+
+
+## Dimensionability reduction *(second priority)*
+
+## Cluster Analysis
+
+## Predictive machine learning (artificial stupidity)
+
+## Executive summary and final conclusions
 
 ## Including Plots
 
