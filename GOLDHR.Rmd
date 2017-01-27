@@ -108,6 +108,8 @@ knitr::kable(show_data)
 
 ## Executive summary and final conclusions
 
+## Recommendations for refinement
+
 ## Including Plots
 
 You can also embed plots, for example:
