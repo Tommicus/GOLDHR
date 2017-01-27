@@ -9,12 +9,18 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r echo=FALSE, message=FALSE}
-source("library.R")
+```{r}
+# Artems Computer: "/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR"
+#("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
+
+setwd("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR")
+
 ```
 
 ```{r echo=FALSE, message=FALSE}
-suppressWarnings(source("library.R"))
+#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+suppressWarnings(source("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR/library.R"))
+
 # Package options
 suppressWarnings(ggthemr('fresh'))  # ggplot theme
 opts_knit$set(progress=FALSE, verbose=FALSE)
@@ -31,7 +37,26 @@ ProjectData_INITIAL <- ProjectData
 ```
 
 ## Objectives of the project
-
+Goal
+We decided to analyse HR data about various metrics related to employees. We picked this data set because it had a considerable number of observations (14,998) and a manageable number of factors (19). This will ease the process of dimensionality reduction (if needed), while providing sufficient basis for a meaningful clustering.
+The factors include a complete set of characteristics: demographics, performance levels, one/off “dummy” variables. Therefore, we will be able to study the interactions between different kinds of factors.
+We would like to take the perspective of an HR manager that is trying to improve the satisfaction levels in his/her company. Therefore, our primary goal would be understanding the drivers of the satisfaction level.
+As a second goal, we will analyse the other factors to understand if any other meaningful relationship exists between them.
+The factors included in the dataset are:
+Satisfaction level (0-1)
+Last valuation (0-1)
+Number of projects
+Average monthly hours
+Time spent in the company
+Working accident (0 or 1)
+Promotion in the last 5 years (0 or 1)
+Departments
+Salary (low – medium – high)
+Whether the employee has left (0 or 1)
+The Department factor included several text options (e.g. sales, hr, accounting). We decided to create additional column for each option, and to populate them with 1 when the value was present in the original column and we 0 in all the others. In this way, we were able to transform text variables into dummy ones.
+ 
+Analysis
+Given that most of the factors are numerical we will use the basic descriptive statistics as a starting point. Then we scaled the results 0-1.
 
 ## Data set
 Load the data from Kaggle.com regarding HR analytics in a major US company
@@ -48,7 +73,7 @@ Let's visualize the sample data for 10 employees
 ```{r echo=FALSE}
 # let's visualize the sample data for 10 employees
 
-ProjectData1 <- ProjectData[,1:18]
+ProjectData1 <- ProjectData[,1:17]
 
 ProjectData1 = data.matrix(ProjectData1)
 ```
@@ -72,7 +97,6 @@ my_summary <- function(thedata){
   t(res)
 }
 
-ProjectData1 <- ProjectData[,1:18]
 
 knitr::kable(round(my_summary(ProjectData1), 2))
 
@@ -83,12 +107,12 @@ We need to scale the data (excluding dummy variables for the department)
 ```{r, echo=FALSE, tidy=TRUE}
 ProjectData2 <- ProjectData[,1:9]
 ProjectData2_scaled=apply(ProjectData2,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+
 ```
 
 Notice now the summary statistics of the scaled dataset (excluding dummy variables for the department):
 
 ```{r echo=FALSE}
-ProjectData2 <- ProjectData[,1:9]
 knitr::kable(round(my_summary(ProjectData2_scaled),2))
 ```
 
@@ -103,6 +127,81 @@ knitr::kable(show_data)
 ## Dimensionability reduction *(second priority)*
 
 ## Cluster Analysis
+# Inputs
+
+```{r setupfactor, echo=TRUE, tidy=TRUE}
+# Columns used
+factor_attributes_used = c(1:17)
+
+# Factor Selection Criteria, Choices: "eigenvalue", "variance", "manual"
+factor_selectionciterion = "manual"
+
+# Please ENTER the desired minumum variance explained 
+minimum_variance_explained = 40  # between 1 and 100
+
+# Please ENTER the number of factors to use 
+manual_numb_factors_used = 4
+
+# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
+rotation_used = "varimax"
+
+```
+
+# Save the Inputs in Variables
+```{r}
+factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData2_scaled))
+ProjectDataFactor <- ProjectData2_scaled[,factor_attributes_used]
+ProjectDataFactor <- ProjectData2_scaled <- data.matrix(ProjectDataFactor)
+```
+
+# Eigenvalue and explained variance
+
+```{r}
+# `PCA` function 
+Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)
+Variance_Explained_Table<-Variance_Explained_Table_results$eig
+Variance_Explained_Table_copy<-Variance_Explained_Table
+
+rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
+colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
+```
+
+```{r}
+iprint.df(round(Variance_Explained_Table, 2))
+```
+
+```{r}
+eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
+df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
+colnames(df) <- c("eigenvalues", "components", "abline")
+iplot.df(melt(df, id="components"))
+```
+
+# See top factors and rotate
+
+```{r}
+if (factor_selectionciterion == "eigenvalue")
+  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
+if (factor_selectionciterion == "variance")
+  factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
+if (factor_selectionciterion == "manual")
+  factors_selected = manual_numb_factors_used
+```
+
+```{r}
+Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
+Rotated_Factors<-round(Rotated_Results$loadings,2)
+Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
+colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
+
+sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
+Rotated_Factors <- Rotated_Factors[sorted_rows,]
+
+iprint.df(Rotated_Factors, scale=TRUE)
+```
+
+
+# Segmentation
 
 ## Predictive machine learning (artificial stupidity)
 
