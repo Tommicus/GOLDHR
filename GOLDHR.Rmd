@@ -231,10 +231,16 @@ profile_with = "kmeans"
 # DEFAULT is "euclidean"
 # distance_used = "euclidean"
 
+<<<<<<< HEAD
 # Please ENTER the hierarchical clustering method to use (options are:
 # "ward", "single", "complete", "average", "mcquitty", "median" or "centroid").
 # DEFAULT is "ward"
 # hclust_method = "ward.D"
+=======
+## Recommendations for refinement
+
+## Including Plots
+>>>>>>> a3d3e2a95264124b8a01264fedf0b0b9380e6e27
 
 # Please ENTER the kmeans clustering method to use (options are:
 # "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
