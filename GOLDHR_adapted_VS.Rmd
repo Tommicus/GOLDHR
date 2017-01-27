@@ -1,0 +1,189 @@
+---
+title: "GOLDHR"
+author: "GroupVAHAC"
+date: "1/26/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Artems Computer: change directory
+setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
+
+```
+
+```{r echo=FALSE, message=FALSE}
+suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+#Artems PC: suppressWarnings(source("library.R"))
+# Package options
+suppressWarnings(ggthemr('fresh'))  # ggplot theme
+opts_knit$set(progress=FALSE, verbose=FALSE)
+opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
+options(knitr.kable.NA = '')
+ 
+Datafile = "data/HR_comma_sep.csv"
+```
+ 
+```{r}
+ProjectData <- read.csv(Datafile)
+ProjectData <- data.matrix(ProjectData)
+ProjectData_INITIAL <- ProjectData
+```
+
+## Objectives of the project
+
+
+## Data set
+Load the data from Kaggle.com regarding HR analytics in a major US company
+
+https://www.kaggle.com/ludobenistant/hr-analytics
+
+```{r echo=FALSE}
+local_directory <- getwd()
+ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
+```
+
+Let's visualize the sample data for 10 employees
+
+```{r echo=FALSE}
+# let's visualize the sample data for 10 employees
+
+ProjectData1 <- ProjectData[,1:17]
+
+ProjectData1 = data.matrix(ProjectData1)
+```
+
+```{r echo=FALSE}
+max_data_report <- 10
+
+knitr::kable(round(head(ProjectData1, max_data_report), 2))
+```
+
+## Descriptive statistics
+
+We show the descriptive statistics of the factors
+
+```{r echo=FALSE}
+my_summary <- function(thedata){
+  res = apply(thedata, 2, function(r) c(min(r), quantile(r, 0.25), quantile(r, 0.5), mean(r), quantile(r, 0.75), max(r), sd(r)))
+  res <- round(res,2)
+  colnames(res) <- colnames(thedata)
+  rownames(res) <- c("min", "25 percent", "median", "mean", "75 percent", "max", "std")
+  t(res)
+}
+
+
+knitr::kable(round(my_summary(ProjectData1), 2))
+
+```
+
+We need to scale the data (excluding dummy variables for the department)
+
+```{r, echo=FALSE, tidy=TRUE}
+ProjectData2 <- ProjectData[,1:9]
+ProjectData2_scaled=apply(ProjectData2,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+
+```
+
+Notice now the summary statistics of the scaled dataset (excluding dummy variables for the department):
+
+```{r echo=FALSE}
+knitr::kable(round(my_summary(ProjectData2_scaled),2))
+```
+
+Let's see how these are correlated. The correlation matrix is as follows:
+
+```{r}
+show_data = round(cor(ProjectData1),2)
+
+knitr::kable(show_data)
+```
+
+## Dimensionability reduction *(second priority)*
+
+## Cluster Analysis
+# Inputs
+
+```{r setupfactor, echo=TRUE, tidy=TRUE}
+# Columns used
+factor_attributes_used = c(1:17)
+
+# Factor Selection Criteria, Choices: "eigenvalue", "variance", "manual"
+factor_selectionciterion = "manual"
+
+# Please ENTER the desired minumum variance explained 
+minimum_variance_explained = 40  # between 1 and 100
+
+# Please ENTER the number of factors to use 
+manual_numb_factors_used = 4
+
+# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
+rotation_used = "varimax"
+
+```
+
+# Save the Inputs in Variables
+```{r}
+factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData2_scaled))
+ProjectDataFactor <- ProjectData2_scaled[,factor_attributes_used]
+ProjectDataFactor <- ProjectData2_scaled <- data.matrix(ProjectDataFactor)
+```
+
+# Eigenvalue and explained variance
+
+```{r}
+# `PCA` function 
+Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)
+Variance_Explained_Table<-Variance_Explained_Table_results$eig
+Variance_Explained_Table_copy<-Variance_Explained_Table
+
+rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
+colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
+```
+
+```{r}
+iprint.df(round(Variance_Explained_Table, 2))
+```
+
+```{r}
+eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
+df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
+colnames(df) <- c("eigenvalues", "components", "abline")
+iplot.df(melt(df, id="components"))
+```
+
+# See top factors and rotate
+
+```{r}
+if (factor_selectionciterion == "eigenvalue")
+  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
+if (factor_selectionciterion == "variance")
+  factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
+if (factor_selectionciterion == "manual")
+  factors_selected = manual_numb_factors_used
+```
+
+```{r}
+Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
+Rotated_Factors<-round(Rotated_Results$loadings,2)
+Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
+colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
+
+sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
+Rotated_Factors <- Rotated_Factors[sorted_rows,]
+
+iprint.df(Rotated_Factors, scale=TRUE)
+```
+
+
+# Segmentation
+
+## Predictive machine learning (artificial stupidity)
+
+## Executive summary and final conclusions
+
+## Including Plots
+
