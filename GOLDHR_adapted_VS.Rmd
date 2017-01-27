@@ -10,17 +10,14 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
-# Artems Computer: "/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR"
-#("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
-
-setwd("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR")
+# Artems Computer: change directory
+setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
 
 ```
 
 ```{r echo=FALSE, message=FALSE}
-#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
-suppressWarnings(source("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR/library.R"))
-
+suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+#Artems PC: suppressWarnings(source("library.R"))
 # Package options
 suppressWarnings(ggthemr('fresh'))  # ggplot theme
 opts_knit$set(progress=FALSE, verbose=FALSE)
@@ -37,26 +34,7 @@ ProjectData_INITIAL <- ProjectData
 ```
 
 ## Objectives of the project
-Goal
-We decided to analyse HR data about various metrics related to employees. We picked this data set because it had a considerable number of observations (14,998) and a manageable number of factors (19). This will ease the process of dimensionality reduction (if needed), while providing sufficient basis for a meaningful clustering.
-The factors include a complete set of characteristics: demographics, performance levels, one/off “dummy” variables. Therefore, we will be able to study the interactions between different kinds of factors.
-We would like to take the perspective of an HR manager that is trying to improve the satisfaction levels in his/her company. Therefore, our primary goal would be understanding the drivers of the satisfaction level.
-As a second goal, we will analyse the other factors to understand if any other meaningful relationship exists between them.
-The factors included in the dataset are:
-Satisfaction level (0-1)
-Last valuation (0-1)
-Number of projects
-Average monthly hours
-Time spent in the company
-Working accident (0 or 1)
-Promotion in the last 5 years (0 or 1)
-Departments
-Salary (low – medium – high)
-Whether the employee has left (0 or 1)
-The Department factor included several text options (e.g. sales, hr, accounting). We decided to create additional column for each option, and to populate them with 1 when the value was present in the original column and we 0 in all the others. In this way, we were able to transform text variables into dummy ones.
- 
-Analysis
-Given that most of the factors are numerical we will use the basic descriptive statistics as a starting point. Then we scaled the results 0-1.
+
 
 ## Data set
 Load the data from Kaggle.com regarding HR analytics in a major US company
@@ -207,14 +185,5 @@ iprint.df(Rotated_Factors, scale=TRUE)
 
 ## Executive summary and final conclusions
 
-## Recommendations for refinement
-
 ## Including Plots
 
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
