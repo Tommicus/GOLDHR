@@ -1,0 +1,363 @@
+---
+title: "GOLDHR"
+author: "GroupVAHAC"
+date: "1/26/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Artems Computer: 
+#setwd("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR")
+#Vanessa:
+setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
+
+
+```
+
+```{r echo=FALSE, message=FALSE}
+suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+#suppressWarnings(source("/Users/Tommicus/Desktop/INSEAD/P3/Big Data and Analytics/GOLDHR/library.R"))
+
+# Package options
+suppressWarnings(ggthemr('fresh'))  # ggplot theme
+opts_knit$set(progress=FALSE, verbose=FALSE)
+opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
+options(knitr.kable.NA = '')
+ 
+Datafile = "data/HR_comma_sep.csv"
+```
+ 
+```{r}
+ProjectData <- read.csv(Datafile)
+ProjectData <- data.matrix(ProjectData)
+ProjectData_INITIAL <- ProjectData
+```
+
+## Objectives of the project
+Goal
+We decided to analyse HR data about various metrics related to employees. We picked this data set because it had a considerable number of observations (14,998) and a manageable number of factors (19). This will ease the process of dimensionality reduction (if needed), while providing sufficient basis for a meaningful clustering.
+The factors include a complete set of characteristics: demographics, performance levels, one/off “dummy” variables. Therefore, we will be able to study the interactions between different kinds of factors.
+We would like to take the perspective of an HR manager that is trying to improve the satisfaction levels in his/her company. Therefore, our primary goal would be understanding the drivers of the satisfaction level.
+As a second goal, we will analyse the other factors to understand if any other meaningful relationship exists between them.
+The factors included in the dataset are:
+Satisfaction level (0-1)
+Last valuation (0-1)
+Number of projects
+Average monthly hours
+Time spent in the company
+Working accident (0 or 1)
+Promotion in the last 5 years (0 or 1)
+Departments
+Salary (low – medium – high)
+Whether the employee has left (0 or 1)
+The Department factor included several text options (e.g. sales, hr, accounting). We decided to create additional column for each option, and to populate them with 1 when the value was present in the original column and we 0 in all the others. In this way, we were able to transform text variables into dummy ones.
+ 
+Analysis
+Given that most of the factors are numerical we will use the basic descriptive statistics as a starting point. Then we scaled the results 0-1.
+
+## Data set
+Load the data from Kaggle.com regarding HR analytics in a major US company
+
+https://www.kaggle.com/ludobenistant/hr-analytics
+
+```{r echo=FALSE}
+local_directory <- getwd()
+ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
+```
+
+Let's visualize the sample data for 10 employees
+
+```{r echo=FALSE}
+# let's visualize the sample data for 10 employees
+
+ProjectData1 <- ProjectData[,1:17]
+
+ProjectData1 = data.matrix(ProjectData1)
+```
+
+```{r echo=FALSE}
+max_data_report <- 25
+
+knitr::kable(round(head(ProjectData1, max_data_report), 2))
+```
+
+## Descriptive statistics
+
+We show the descriptive statistics of the factors
+
+```{r echo=FALSE}
+my_summary <- function(thedata){
+  res = apply(thedata, 2, function(r) c(min(r), quantile(r, 0.25), quantile(r, 0.5), mean(r), quantile(r, 0.75), max(r), sd(r)))
+  res <- round(res,2)
+  colnames(res) <- colnames(thedata)
+  rownames(res) <- c("min", "25 percent", "median", "mean", "75 percent", "max", "std")
+  t(res)
+}
+
+
+knitr::kable(round(my_summary(ProjectData1), 2))
+
+```
+
+We need to scale the data (excluding dummy variables for the department)
+
+```{r, echo=FALSE, tidy=TRUE}
+ProjectData2 <- ProjectData[,1:9]
+ProjectData_Clustering=apply(ProjectData2,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+
+```
+
+Notice now the summary statistics of the scaled dataset (excluding dummy variables for the department):
+
+```{r echo=FALSE}
+knitr::kable(round(my_summary(ProjectData_Clustering),2))
+```
+
+Let's see how these are correlated. The correlation matrix is as follows:
+
+```{r}
+show_data = round(cor(ProjectData1),2)
+
+knitr::kable(show_data)
+```
+
+## Dimensionability reduction *(second priority)*
+
+## Cluster Analysis
+# Inputs
+
+```{r setupfactor, echo=TRUE, tidy=TRUE}
+# Columns used
+factor_attributes_used = c(1:17)
+
+# Factor Selection Criteria, Choices: "eigenvalue", "variance", "manual"
+factor_selectionciterion = "manual"
+
+# Please ENTER the desired minumum variance explained 
+minimum_variance_explained = 40  # between 1 and 100
+
+# Please ENTER the number of factors to use 
+manual_numb_factors_used = 4
+
+# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
+rotation_used = "varimax"
+
+```
+
+# Define Database for Clustering and Segmentation
+```{r}
+ProjectData_Clustering <- ProjectData2_scaled[,c(1:6,8:9)]
+```
+
+
+
+# Save the Inputs in Variables
+```{r}
+factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData_Clustering))
+ProjectDataFactor <- ProjectData_Clustering[,factor_attributes_used]
+ProjectDataFactor <- ProjectData_Clustering <- data.matrix(ProjectDataFactor)
+```
+
+# Eigenvalue and explained variance
+
+```{r}
+# `PCA` function 
+Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)
+Variance_Explained_Table<-Variance_Explained_Table_results$eig
+Variance_Explained_Table_copy<-Variance_Explained_Table
+
+rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
+colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
+```
+
+```{r}
+iprint.df(round(Variance_Explained_Table, 2))
+```
+
+```{r}
+eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
+df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
+colnames(df) <- c("eigenvalues", "components", "abline")
+iplot.df(melt(df, id="components"))
+```
+
+# See top factors and rotate
+
+```{r}
+if (factor_selectionciterion == "eigenvalue")
+  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
+if (factor_selectionciterion == "variance")
+  factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
+if (factor_selectionciterion == "manual")
+  factors_selected = manual_numb_factors_used
+```
+
+```{r}
+Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
+Rotated_Factors<-round(Rotated_Results$loadings,2)
+Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
+colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
+
+sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
+Rotated_Factors <- Rotated_Factors[sorted_rows,]
+
+iprint.df(Rotated_Factors, scale=TRUE)
+```
+
+
+# Segmentation
+
+# Set Input Variables
+```{r setupcluster, echo=TRUE, tidy=TRUE}
+# Select Attributes to use
+segmentation_attributes_used = c(1,2,3) #c(10,19,5,12,3) 
+
+# original raw attributes 
+profile_attributes_used = c(1:8) 
+
+# Please ENTER the number of clusters to eventually use for this report
+numb_clusters_used = 5 # for boats possibly use 5, for Mall_Visits use 3
+
+# Please enter the method to use for the segmentation:
+profile_with = "kmeans"
+
+
+# Please ENTER the distance metric eventually used for the clustering in case of hierarchical clustering 
+# (e.g. "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski" - see help(dist)). 
+# DEFAULT is "euclidean"
+# distance_used = "euclidean"
+
+<<<<<<< HEAD
+# Please ENTER the hierarchical clustering method to use (options are:
+# "ward", "single", "complete", "average", "mcquitty", "median" or "centroid").
+# DEFAULT is "ward"
+# hclust_method = "ward.D"
+=======
+## Recommendations for refinement
+
+## Including Plots
+>>>>>>> a3d3e2a95264124b8a01264fedf0b0b9380e6e27
+
+# Please ENTER the kmeans clustering method to use (options are:
+# "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
+# DEFAULT is "Lloyd"
+kmeans_method = "Lloyd"
+
+```
+
+# Save selected criteria
+
+```{r}
+segmentation_attributes_used <- intersect(segmentation_attributes_used, 1:ncol(ProjectData_Clustering))
+profile_attributes_used <- intersect(profile_attributes_used, 1:ncol(ProjectData_Clustering))
+
+ProjectData_segment <- ProjectData_Clustering[,segmentation_attributes_used]
+ProjectData_profile <- ProjectData_Clustering[,profile_attributes_used]
+
+ProjectData_scaled <- apply(ProjectData_Clustering, 2, function(r) if (sd(r)!=0) (r-mean(r))/sd(r) else 0*r)
+```
+
+# Apply kmeans to calculate clusters/segments
+
+```{r}
+kmeans_clusters <- kmeans(ProjectData_Clustering,centers= numb_clusters_used, iter.max=2000, algorithm=kmeans_method)
+
+ProjectData_with_kmeans_membership <- cbind(1:length(kmeans_clusters$cluster),kmeans_clusters$cluster)
+colnames(ProjectData_with_kmeans_membership)<-c("Empl.Nr","Cluster_Membership")
+
+iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))
+```
+
+# Segment comparison to mean
+
+```{r}
+cluster_memberships_kmeans <- kmeans_clusters$cluster 
+cluster_ids_kmeans <- unique(cluster_memberships_kmeans)
+
+if(FALSE) {
+if (profile_with == "hclust"){
+  cluster_memberships <- cluster_memberships_hclust
+  cluster_ids <-  cluster_ids_hclust  
+}
+if (profile_with == "kmeans"){
+  cluster_memberships <- cluster_memberships_kmeans
+  cluster_ids <-  cluster_ids_kmeans
+}}
+
+cluster_memberships <- cluster_memberships_kmeans
+cluster_ids <-  cluster_ids_kmeans
+
+NewData = matrix(cluster_memberships,ncol=1)
+
+population_average = matrix(apply(ProjectData_profile, 2, mean), ncol=1)
+colnames(population_average) <- "Population"
+Cluster_Profile_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_profile[(cluster_memberships==i), ], 2, mean))
+if (ncol(ProjectData_profile) <2)
+  Cluster_Profile_mean=t(Cluster_Profile_mean)
+colnames(Cluster_Profile_mean) <- paste("Seg.", 1:length(cluster_ids), sep="")
+cluster.profile <- cbind (population_average,Cluster_Profile_mean)
+
+iprint.df(round(cluster.profile, 2))
+```
+# Visualization of Segments
+
+```{r}
+ProjectData_scaled_profile = ProjectData_scaled[, profile_attributes_used,drop=F]
+
+Cluster_Profile_standar_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_scaled_profile[(cluster_memberships==i), ,drop = F], 2, mean))
+if (ncol(ProjectData_scaled_profile) < 2)
+  Cluster_Profile_standar_mean = t(Cluster_Profile_standar_mean)
+colnames(Cluster_Profile_standar_mean) <- paste("Seg ", 1:length(cluster_ids), sep="")
+
+iplot.df(melt(cbind.data.frame(idx=as.numeric(1:nrow(Cluster_Profile_standar_mean)), Cluster_Profile_standar_mean), id="idx"), xlab="Profiling variables (standardized)",  ylab="Mean of cluster")
+```
+
+# Create Department Table
+
+```{r}
+ProjectData_Departments <- ProjectData[,c(10:17)]
+
+ProjectData_Departments <- cbind(Empl.Nr = c(1:nrow(ProjectData_Departments)), ProjectData_Departments)
+
+```
+
+```{r}
+ProjectData_Departments <- merge(x=ProjectData_Departments, y=ProjectData_with_kmeans_membership, by = "Empl.Nr", all.x=TRUE)
+```
+
+
+```{r}
+
+resultstable = NULL
+
+for (NrClusters in unique(ProjectData_Departments$Cluster_Membership)){
+  temp = sum(ProjectData_Departments$Cluster_Membership == NrClusters)
+  resultstable = c(resultstable,temp)
+}
+    
+newtable= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtable)[1] <- "Cluster"
+
+if(FALSE)  {                        
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters)
+)}
+
+newtable <- cbind(newtable, Sales = 0, Accounting = 0, Hr = 0, product_mng = 0, technical = 0, support = 0, IT = 0, RandD = 0)
+                    
+                    
+                    sum(ProjectData_Departments[,2],Cluster_Membership = 1), Accounting = sum(ProjectData_Departments[,3],Cluster_Membership = 1), Hr = sum(ProjectData_Departments[,4],Cluster_Membership = 1), product_mng = sum(ProjectData_Departments[,5],Cluster_Membership = 1), technical = sum(ProjectData_Departments[,6],Cluster_Membership = 1), support = sum(ProjectData_Departments[,7],Cluster_Membership = 1), IT = sum(ProjectData_Departments[,8],Cluster_Membership = 1), RandD = sum(ProjectData_Departments[,9],Cluster_Membership = 1))
+
+
+newtable[row_number("Cluster" == "1"),"Sales"]= 4
+
+for ( NrClusters in unique(ProjectData_Departments$Cluster_Membership)) {
+newtable[NrClusters,"Sales"] = 1}
+  
+```
+
+
+
