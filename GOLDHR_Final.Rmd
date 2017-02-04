@@ -1,0 +1,1161 @@
+---
+title: "GOLDHR"
+author: "GroupVAHAC"
+date: "1/26/2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r echo=FALSE, message=FALSE}
+#Vanessa:
+##setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
+
+# Artems Computer: 
+setwd("/Users/Chris/Documents/GOLDHR")
+```
+
+```{r echo=FALSE, message=FALSE}
+#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+suppressWarnings(source("/Users/Chris/Documents/GOLDHR/library.R"))
+
+
+# Package options
+suppressWarnings(ggthemr('fresh'))  # ggplot theme
+opts_knit$set(progress=FALSE, verbose=FALSE)
+opts_chunk$set(echo=FALSE, fig.align="center", fig.width=10, fig.height=6.35, results="asis")
+options(knitr.kable.NA = '')
+ 
+Datafile = "data/HR_comma_sep.csv"
+```
+ 
+```{r}
+ProjectData <- read.csv(Datafile)
+ProjectData <- data.matrix(ProjectData)
+ProjectData_INITIAL <- ProjectData
+```
+
+## Objectives of the project
+Goal
+<br><br>
+We decided to analyse HR data about various metrics related to employees. We took a sample data set from a large American corporation to propose a model to analyze one of the most pressing business problems nowadays: employee turnover. Therefore, our primary goal is understanding the drivers of turnover - why do people leave the company?
+
+#### Data set
+<br>Load the data from Kaggle.com regarding HR analytics in a major US company
+<br>https://www.kaggle.com/ludobenistant/hr-analytics
+<br><br>
+We picked the underlying data set for the following reasons: it had a considerable number of observations (14,998) and a manageable number of factors (19). This will ease the process of dimensionality reduction, while providing sufficient basis for a meaningful segmentation. The factors include a complete set of characteristics: demographics, performance levels, one/off “dummy” variables. Therefore, we will be able to study the interactions between different kinds of factors.
+<br><br>
+The factors included in the dataset are:
+<br>* Satisfaction level (0-1) - Our dependent variable
+<br>* Last valuation (0-1) - The score received during performance review
+<br>* Number of projects in which the employee was engaged
+<br>* Average monthly hours worked
+<br>* Time spent in the company in years
+<br>* Working accident (0 or 1) - If the person had work-related accidents
+<br>* Promotion in the last 5 years (0 or 1)
+<br>* Department in which the person works
+<br>* Salary (low – medium – high)
+<br>* Whether the employee has left (0 or 1)
+<br><br>
+The Department factor included several text options (e.g. sales, hr, accounting). We decided to create an additional column for each option, and to populate them with 1 when the value was present in the original column and with 0 in all the others. In this way, we were able to transform text variables into dummy variables. Given that most of the factors are numerical we will use basic descriptive statistics as a starting point. Then we scale the results 0-1.
+
+```{r echo=FALSE}
+local_directory <- getwd()
+ProjectData <- read.csv(file = "data/HR_comma_sep.csv", header = TRUE, sep=",")
+```
+
+Below the visualization of a sample of the data for 15 employees. On the right we can see the columns for the Department that we have created to better work on the data.:
+
+```{r echo=FALSE}
+# let's visualize the sample data for 10 employees
+
+ProjectData1 <- ProjectData[,1:17]
+
+ProjectData1 = data.matrix(ProjectData1)
+```
+
+```{r echo=FALSE}
+max_data_report <- 15
+
+knitr::kable(round(head(ProjectData1, max_data_report), 2))
+```
+
+## Descriptive statistics
+
+We start by calculating the descriptive statistics of the factors.
+Afterwards, we run the summary statistics of the scaled dataset (excluding dummy variables for the department):
+
+```{r echo=FALSE}
+my_summary <- function(thedata){
+  res = apply(thedata, 2, function(r) c(min(r), quantile(r, 0.25), quantile(r, 0.5), mean(r), quantile(r, 0.75), max(r), sd(r)))
+  res <- round(res,2)
+  colnames(res) <- colnames(thedata)
+  rownames(res) <- c("min", "25 percent", "median", "mean", "75 percent", "max", "std")
+  t(res)
+}
+
+
+knitr::kable(round(my_summary(ProjectData1), 2))
+
+```
+
+We now scale the data (excluding the dummy variables) to make them more comparable and to ease the analyis.
+
+```{r, echo=FALSE, tidy=TRUE}
+
+
+ProjectData2 <- ProjectData[,c(1:6,8:17)]
+ProjectData2_scaled = ProjectData2
+ProjectData2_scaled[,1:5]<- apply(ProjectData2[,1:5],2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+
+ProjectData2 <- ProjectData[,1:9]
+ProjectData_Clustering=apply(ProjectData2,2, function(r) {if (sd(r)!=0) res=(r-mean(r))/sd(r) else res=0*r; res})
+
+```
+
+
+Notice now the summary statistics of the scaled dataset (excluding dummy variables for the department):
+
+```{r echo=FALSE}
+knitr::kable(round(my_summary(ProjectData_Clustering),2))
+```
+
+Let's see how these are correlated. The correlation matrix is as follows:
+
+```{r}
+show_data = round(cor(ProjectData1),2)
+
+knitr::kable(show_data)
+```
+
+Looking at the correlation matrix we already develop some expectations for the employee segmentation analysis:
+<br>
+* We see high positive or negative correlations with at least one other factor for satisfaction level, last evaluation, number of projects, average monthly hours and time spend in the company. Consequently, we expect these factors to play a major role in the segmentation of employees
+<br>* Work accidents, salary and promotion do not show any strong correlation with other factors. We cannot tell yet whether or not they are important for employees, but apparently, they will probably not be a driving factor for splitting them into segments
+<br>* At the same time, departments show very low correlations with the remaining factors. Thus, we do not expect that they can be used for profiling later on, but this will be analyzed in a seperate step
+<br>* Left (employee turnover) is strongly negatively correlated with Satisfaction level: -0.39. Consequently, at the current stage, we expect satisfaction level to be one of the drivers for employee turnover
+
+## Dimensionability reduction 
+
+<br>For Dimensionality reduction we followed the process highlighted in class.
+<br><br>
+Based on the cummulative variance explained, we decided to group the factors into three components. Three components explain more than 50% of the variance (see charts below).
+
+#### Inputs
+
+```{r setupfactor, echo=TRUE, tidy=TRUE}
+
+
+# Columns used
+factor_attributes_used = c(1:17)
+
+# Factor Selection Criteria, Choices: "eigenvalue", "variance", "manual"
+factor_selectionciterion = "manual"
+
+# Please ENTER the desired minumum variance explained 
+minimum_variance_explained = 40  # between 1 and 100
+
+# Please ENTER the number of factors to use 
+manual_numb_factors_used = 3
+
+# Please ENTER the rotation eventually used (e.g. "none", "varimax", "quatimax", "promax", "oblimin", "simplimax", and "cluster" - see help(principal)). Default is "varimax"
+rotation_used = "varimax"
+
+```
+
+#### Define Database for Clustering and Segmentation
+
+For dimensionability reduction and employee segmentation we use the following eight factors: satisfaction level, last evaluation, number of projects, average monthly hours, time spend in the company, Work accidents, salary, and promotion. 
+
+```{r, echo=TRUE, tidy=TRUE}
+ProjectData_Clustering <- ProjectData2_scaled[,c(1:8)]
+```
+
+
+
+#### Save the Inputs in Variables
+```{r, echo=TRUE, tidy=TRUE}
+factor_attributes_used <- intersect(factor_attributes_used, 1:ncol(ProjectData_Clustering))
+ProjectDataFactor <- ProjectData_Clustering[,factor_attributes_used]
+ProjectDataFactor <- ProjectData_Clustering <- data.matrix(ProjectDataFactor)
+```
+
+#### Eigenvalue and explained variance
+
+```{r, echo=TRUE, tidy=TRUE}
+# `PCA` function 
+Variance_Explained_Table_results<-PCA(ProjectDataFactor, graph=FALSE)
+Variance_Explained_Table<-Variance_Explained_Table_results$eig
+Variance_Explained_Table_copy<-Variance_Explained_Table
+
+rownames(Variance_Explained_Table) <- paste("Component", 1:nrow(Variance_Explained_Table), sep=" ")
+colnames(Variance_Explained_Table) <- c("Eigenvalue", "Pct of explained variance", "Cumulative pct of explained variance")
+```
+
+```{r, echo=TRUE, tidy=TRUE}
+iprint.df(round(Variance_Explained_Table, 2))
+```
+
+```{r, echo=TRUE, tidy=TRUE}
+eigenvalues  <- Variance_Explained_Table[, "Eigenvalue"]
+df           <- cbind(as.data.frame(eigenvalues), c(1:length(eigenvalues)), rep(1, length(eigenvalues)))
+colnames(df) <- c("eigenvalues", "components", "abline")
+iplot.df(melt(df, id="components"))
+```
+
+#### See top factors and rotate
+
+```{r, echo=TRUE, tidy=TRUE}
+if (factor_selectionciterion == "eigenvalue")
+  factors_selected = sum(Variance_Explained_Table_copy[,1] >= 1)
+if (factor_selectionciterion == "variance")
+  factors_selected = 1:head(which(Variance_Explained_Table_copy[,"cumulative percentage of variance"]>= minimum_variance_explained),1)
+if (factor_selectionciterion == "manual")
+  factors_selected = manual_numb_factors_used
+```
+
+```{r, echo=TRUE, tidy=TRUE}
+Rotated_Results<-principal(ProjectDataFactor, nfactors=max(factors_selected), rotate=rotation_used,score=TRUE)
+Rotated_Factors<-round(Rotated_Results$loadings,2)
+Rotated_Factors<-as.data.frame(unclass(Rotated_Factors))
+colnames(Rotated_Factors)<-paste("Comp.",1:ncol(Rotated_Factors),sep="")
+
+sorted_rows <- sort(Rotated_Factors[,1], decreasing = TRUE, index.return = TRUE)$ix
+Rotated_Factors <- Rotated_Factors[sorted_rows,]
+
+iprint.df(Rotated_Factors, scale=TRUE)
+```
+
+We see that we do not need to perform the PCA, hence we will use all of the variables in our analysis
+
+## Segmentation
+<br>
+From the above exercise, we have established four key components, as well as the attributes that best associate with these components. We can infer from the data that each of the components refers to the following:
+<br>
+<br>Comp.1: Care about the work 
+<br>Comp.2: Satisfaction with the company
+<br>Comp.3: Driven by external incentives
+<br><br>
+Using these components, we can now begin our segmentation.
+<br><br>
+#### Set Input Variables
+```{r setupcluster, echo=TRUE, tidy=TRUE}
+# Select Attributes to use
+segmentation_attributes_used = c(1,4,8) #c(10,19,5,12,3) 
+
+# original raw attributes 
+profile_attributes_used = c(1:17) 
+
+# Please ENTER the number of clusters to eventually use for this report
+numb_clusters_used = 3 # for boats possibly use 5, for Mall_Visits use 3
+
+# Please enter the method to use for the segmentation:
+profile_with = "kmeans"
+
+
+# Please ENTER the distance metric eventually used for the clustering in case of hierarchical clustering 
+# (e.g. "euclidean", "maximum", "manhattan", "canberra", "binary" or "minkowski" - see help(dist)). 
+# DEFAULT is "euclidean"
+# distance_used = "euclidean"
+
+
+# Please ENTER the kmeans clustering method to use (options are:
+# "Hartigan-Wong", "Lloyd", "Forgy", "MacQueen").
+# DEFAULT is "Lloyd"
+kmeans_method = "Lloyd"
+
+```
+<br>
+First, we selected our segmentation attributes by taking the attributes that most resonate with each of the four components. Specifically, we used satisfaction_level (table column 1, component 2), average_monthly_hours (table column 4, component 1), and promotion_last_5_years (table column 8, component 3) to represent components 1, 2, and 3 respectively.
+<br><br>
+Next, for profile_attributes_used, we included all the columns (our eight factors stated above) in the data set, per standard procedure.
+<br><br>
+For the number of segments used, we conducted a number of trials to arrive at the appropriate number of segments that were clearly distinct from each other. We started with 5, but noticed that while four segments were highly differentiated, there was one segment that had no attributes that they strongly represented. Thus, we tried narrowing the segments to 4, and noticed still some errant clusters. Once we brought it down to 3, we finally reached three unique, highly differentiated segments This is the number we used for our segmentation method.
+<br><br>
+Finally, we used a Kmeans-Lloyd segmentation method.
+<br>
+
+#### Save selected criteria
+
+```{r echo=TRUE, tidy=TRUE}
+segmentation_attributes_used <- intersect(segmentation_attributes_used, 1:ncol(ProjectData_Clustering))
+profile_attributes_used <- intersect(profile_attributes_used, 1:ncol(ProjectData_Clustering))
+
+ProjectData_segment <- ProjectData_Clustering[,segmentation_attributes_used]
+ProjectData_profile <- ProjectData_Clustering[,profile_attributes_used]
+
+ProjectData_scaled <- apply(ProjectData_Clustering, 2, function(r) if (sd(r)!=0) (r-mean(r))/sd(r) else 0*r)
+```
+<br>
+This is the intermediary step that we undertook, assigning variables and tables for the exercises below.
+
+#### Apply kmeans to calculate clusters/segments
+
+```{r echo=TRUE, tidy=TRUE}
+kmeans_clusters <- kmeans(ProjectData_Clustering,centers= numb_clusters_used, iter.max=2000, algorithm=kmeans_method)
+
+ProjectData_with_kmeans_membership <- cbind(1:length(kmeans_clusters$cluster),kmeans_clusters$cluster)
+colnames(ProjectData_with_kmeans_membership)<-c("Empl.Nr","Cluster_Membership")
+
+iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))
+```
+<br>
+Using the above algorithm, we plotted which employees would fall under the three segments we declared. Here we have a sample of employees, and we see a fairly non-biased distribution of across segments.
+
+#### Segment comparison to mean
+
+Please note that in the following table the first five factors are scaled from -1 to 1, the sixth and seventh factor are binary and the eigth factor is based on integers 0, 1, and 2. 
+
+```{r echo=TRUE, tidy=TRUE}
+cluster_memberships_kmeans <- kmeans_clusters$cluster 
+cluster_ids_kmeans <- unique(cluster_memberships_kmeans)
+
+if(FALSE) {
+if (profile_with == "hclust"){
+  cluster_memberships <- cluster_memberships_hclust
+  cluster_ids <-  cluster_ids_hclust  
+}
+if (profile_with == "kmeans"){
+  cluster_memberships <- cluster_memberships_kmeans
+  cluster_ids <-  cluster_ids_kmeans
+}}
+
+cluster_memberships <- cluster_memberships_kmeans
+cluster_ids <-  cluster_ids_kmeans
+
+NewData = matrix(cluster_memberships,ncol=1)
+
+population_average = matrix(apply(ProjectData_profile, 2, mean), ncol=1)
+colnames(population_average) <- "Population"
+Cluster_Profile_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_profile[(cluster_memberships==i), ], 2, mean))
+if (ncol(ProjectData_profile) <2)
+  Cluster_Profile_mean=t(Cluster_Profile_mean)
+colnames(Cluster_Profile_mean) <- paste("Seg.", 1:length(cluster_ids), sep="")
+colnames(Cluster_Profile_mean)[3] <- "Unchallenged"
+colnames(Cluster_Profile_mean)[1] <- "FreshAndHappy"
+colnames(Cluster_Profile_mean)[2] <- "Overworked"
+cluster.profile <- cbind (population_average,Cluster_Profile_mean)
+
+iprint.df(round(cluster.profile, 2))
+```
+
+#### Visualization of Segments
+
+```{r echo=TRUE, tidy=TRUE}
+ProjectData_scaled_profile = ProjectData_scaled[, profile_attributes_used,drop=F]
+
+Cluster_Profile_standar_mean <- sapply(sort(cluster_ids), function(i) apply(ProjectData_scaled_profile[(cluster_memberships==i), ,drop = F], 2, mean))
+if (ncol(ProjectData_scaled_profile) < 2)
+  Cluster_Profile_standar_mean = t(Cluster_Profile_standar_mean)
+colnames(Cluster_Profile_standar_mean) <- paste("Seg ", 1:length(cluster_ids), sep="")
+colnames(Cluster_Profile_standar_mean)[3] <- "Unchallenged"
+colnames(Cluster_Profile_standar_mean)[1] <- "FreshAndHappy"
+colnames(Cluster_Profile_standar_mean)[2] <- "Overworked"
+iplot.df(melt(cbind.data.frame(idx=as.numeric(1:nrow(Cluster_Profile_standar_mean)), Cluster_Profile_standar_mean), id="idx"), xlab="Profiling variables (standardized)",  ylab="Mean of cluster")
+```
+<br>
+Here we see in greater detail how each segment of employees values or de-values some of our key attributes. This gives us more information on the nature of each of the segment profiles. Based on the table above and graph above, we interprete the segments as follows: 
+<br>* The "Fresh&Happy" Segment has very high satisfaction levels, employees are relatively new to the company, and have a slightly higher salary than the average. 
+<br>* The "Unchallenged" Segment is characterized by few projects, few monthly hours, and low evaluations. They generally have low satisfaction levels.
+<br>* The "Overworked" Segment is characterized by long hours and many projects. Employees have generally high evaluations and spend a significant time in the company already. Satisfaction level is low.
+<br><br>
+Our best guess based on the data and our interpretation is that low satisfaction is triggered by either either being unchallenged or overworked. However, the next step in the analysis could be to check whether this hypothesis is correct, by running a regression of the Satisfaction level with other factors.
+<br><br>
+As already anticipated when looking at the correlation analysis, we now see that salary promotion and work accident cannnot be used as attributes for segmentation as they are equally important or not important across employees in all segments. All three segments show numbers that are very close to the average of the total population.
+
+## Profiling
+#### Create Department Table
+
+We observed before that the correlation between the variables and the Department, in which a person works, was close to 0. However, we wanted to cross-check if segments may be profiled by the departments. <br>
+The first table shows the number of people of each segment employed in each department.
+From the second table, we can see that, despite being different in size, the departments are equally represented in the segments in % term. Basically, every department has the same share of people of the same segment. These numbers appear to be almost too close: this may be a potential red flag about the quality (potential lack of randombess) of the data base.
+
+```{r echo=TRUE, tidy=TRUE}
+ProjectData_Departments <- ProjectData[,c(7,10:17)]
+
+ProjectData_Departments <- cbind(Empl.Nr = c(1:nrow(ProjectData_Departments)), ProjectData_Departments)
+
+```
+
+```{r echo=TRUE, tidy=TRUE}
+ProjectData_Departments <- merge(x=ProjectData_Departments, y=ProjectData_with_kmeans_membership, by = "Empl.Nr", all.x=TRUE)
+```
+
+
+```{r echo=TRUE, tidy=TRUE}
+
+resultstable = NULL
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters)
+)
+
+newtable= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtable)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Sales ==1)
+)
+
+newtablesales= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablesales)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Accounting ==1)
+)
+
+newtableaccounting= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtableaccounting)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Hr ==1)
+)
+
+newtablehr= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablehr)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$product_mng ==1)
+)
+
+newtablepm= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablepm)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$technical ==1)
+)
+
+newtabletech= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtabletech)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$support ==1)
+)
+
+newtablesupport= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablesupport)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$IT ==1)
+)
+
+newtableit= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtableit)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$RandD ==1)
+)
+
+newtablerand= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablerand)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Sales ==0 & ProjectData_Departments$Accounting ==0 & ProjectData_Departments$Hr ==0 & ProjectData_Departments$product_mng ==0 & ProjectData_Departments$technical ==0 & ProjectData_Departments$support ==0 & ProjectData_Departments$IT ==0 & ProjectData_Departments$RandD ==0)
+)
+
+newtablemktandmgmt= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablemktandmgmt)[1] <- "Cluster"
+
+ProjectData_SegmentStats <- merge(x=newtable, y=newtablesales, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[2] <- "Total"
+colnames(ProjectData_SegmentStats)[3] <- "Sales"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtableaccounting, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[4] <- "Accounting"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtablehr, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[5] <- "Hr"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtablepm, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[6] <- "product_mng"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtabletech, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[7] <- "technical"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtablesupport, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[8] <- "support"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtableit, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[9] <- "IT"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtablerand, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[10] <- "RandD"
+
+ProjectData_SegmentStats <- merge(x=ProjectData_SegmentStats, y=newtablemktandmgmt, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentStats)[11] <- "Marketing/Management"
+colnames(ProjectData_SegmentStats)[1] <- "Segment"
+rownames(ProjectData_SegmentStats)[1] <- "FreshAndHappy"
+rownames(ProjectData_SegmentStats)[2] <- "Overworked"
+rownames(ProjectData_SegmentStats)[3] <- "Unchallenged"
+iprint.df(round(ProjectData_SegmentStats, 1))
+```
+
+```{r echo=TRUE, tidy=TRUE}
+
+salespercent = c(1,2,3)
+accountingpercent = c(1,2,3)
+hrpercent = c(1,2,3)
+pmpercent = c(1,2,3)
+techpercent = c(1,2,3)
+supportpercent = c(1,2,3)
+itpercent = c(1,2,3)
+randdpercent = c(1,2,3)
+mktgmgtpercent = c(1,2,3)
+
+newintermediatetable= cbind(ProjectData_SegmentStats,salespercent, accountingpercent,hrpercent,pmpercent,techpercent,supportpercent,itpercent,randdpercent,mktgmgtpercent)
+
+newintermediatetable[,"salespercent"] = round(newintermediatetable[,"Sales"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"accountingpercent"] = round(newintermediatetable[,"Accounting"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"hrpercent"] = round(newintermediatetable[,"Hr"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"pmpercent"] = round(newintermediatetable[,"product_mng"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"techpercent"] = round(newintermediatetable[,"technical"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"supportpercent"] = round(newintermediatetable[,"support"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"itpercent"] = round(newintermediatetable[,"IT"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"randdpercent"] = round(newintermediatetable[,"RandD"]/newintermediatetable[,"Total"],4)*100
+
+newintermediatetable[,"mktgmgtpercent"] = round(newintermediatetable[,"Marketing/Management"]/newintermediatetable[,"Total"],4)*100
+
+ProjectData_SegmentPcts = newintermediatetable[,c(1,2,12:20)]
+
+iprint.df(round(ProjectData_SegmentPcts, 2))
+```
+The next two tables limit the number of employees in each segment to those who left the company. We see that 50% of the employees, the "Fresh&Happy" Segment, shows a very low turn rate, while the turnrate is high for the other two segments (please note that the "Fresh&Happy" Segment could be partially biased because employees are rather new in the company and consequently did not have too much time to leave yet.) The "Overworked" Segment shows the highest turnrate.
+```{r echo=TRUE, tidy=TRUE}
+
+resultstable = NULL
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters)
+)
+
+newtable= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtable)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Sales ==1 & ProjectData_Departments$left ==1)
+)
+
+newtablesales= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablesales)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Accounting ==1 & ProjectData_Departments$left ==1)
+)
+
+newtableaccounting= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtableaccounting)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Hr ==1 & ProjectData_Departments$left ==1)
+)
+
+newtablehr= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablehr)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$product_mng ==1 & ProjectData_Departments$left ==1)
+)
+
+newtablepm= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablepm)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$technical ==1 & ProjectData_Departments$left ==1)
+)
+
+newtabletech= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtabletech)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$support ==1 & ProjectData_Departments$left ==1)
+)
+
+newtablesupport= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablesupport)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$IT ==1 & ProjectData_Departments$left ==1)
+)
+
+newtableit= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtableit)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$RandD ==1 & ProjectData_Departments$left ==1)
+)
+
+newtablerand= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablerand)[1] <- "Cluster"
+
+resultstable = sapply(unique(ProjectData_Departments$Cluster_Membership), function(NrClusters)  sum(ProjectData_Departments$Cluster_Membership ==NrClusters & ProjectData_Departments$Sales ==0 & ProjectData_Departments$Accounting ==0 & ProjectData_Departments$Hr ==0 & ProjectData_Departments$product_mng ==0 & ProjectData_Departments$technical ==0 & ProjectData_Departments$support ==0 & ProjectData_Departments$IT ==0 & ProjectData_Departments$RandD ==0 & ProjectData_Departments$left ==1) 
+)
+
+newtablemktandmgmt= cbind( unique(ProjectData_Departments$Cluster_Membership),resultstable) 
+colnames(newtablemktandmgmt)[1] <- "Cluster"
+
+ProjectData_SegmentChurnStats <- merge(x=newtable, y=newtablesales, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[2] <- "Total"
+colnames(ProjectData_SegmentChurnStats)[3] <- "Sales"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtableaccounting, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[4] <- "Accounting"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtablehr, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[5] <- "Hr"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtablepm, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[6] <- "product_mng"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtabletech, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[7] <- "technical"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtablesupport, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[8] <- "support"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtableit, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[9] <- "IT"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtablerand, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[10] <- "RandD"
+
+ProjectData_SegmentChurnStats <- merge(x=ProjectData_SegmentChurnStats, y=newtablemktandmgmt, by = "Cluster", all.x=TRUE)
+colnames(ProjectData_SegmentChurnStats)[11] <- "Marketing/Management"
+colnames(ProjectData_SegmentChurnStats)[1] <- "Segment"
+rownames(ProjectData_SegmentChurnStats)[1] <- "FreshAndHappy"
+rownames(ProjectData_SegmentChurnStats)[2] <- "Overworked"
+rownames(ProjectData_SegmentChurnStats)[3] <- "Unchallenged"
+iprint.df(round(ProjectData_SegmentChurnStats, 1))
+```
+The summary table below shows the segment, the total number of employees that where grouped into this segment, the segment size compared to the total number of employees in the company (int the database), the number of people who left the company and the the churn rate calculated by people who left devided by the total number of people in this segment.
+<br><br>
+As mentioned above, when implementing measures to decrease the company's churn rate, one should not focus too much on the "Fresh&Happy" Segment, while being very concerned about the other two segments, which show rates close to or above 50%.
+```{r echo=TRUE, tidy=TRUE}
+
+newintermediatetable= cbind(ProjectData_SegmentStats,ProjectData_SegmentChurnStats[,3:11])
+
+newintermediatetable[,"salespercent"] = round(newintermediatetable[,12]/newintermediatetable[,3],4)
+
+newintermediatetable[,"accountingpercent"] = round(newintermediatetable[,13]/newintermediatetable[,4],4)
+
+newintermediatetable[,"hrpercent"] = round(newintermediatetable[,14]/newintermediatetable[,5],4)
+
+newintermediatetable[,"pmpercent"] = round(newintermediatetable[,15]/newintermediatetable[,6],4)
+
+newintermediatetable[,"techpercent"] = round(newintermediatetable[,16]/newintermediatetable[,7],4)
+
+newintermediatetable[,"supportpercent"] = round(newintermediatetable[,17]/newintermediatetable[,8],4)
+
+newintermediatetable[,"itpercent"] = round(newintermediatetable[,18]/newintermediatetable[,9],4)
+
+newintermediatetable[,"randdpercent"] = round(newintermediatetable[,19]/newintermediatetable[,10],4)
+
+newintermediatetable[,"mktgmgtpercent"] = round(newintermediatetable[,20]/newintermediatetable[,11],4)
+
+ProjectData_SegmentChurnPcts = newintermediatetable[,c(21:29)]*100
+
+iprint.df(round(ProjectData_SegmentChurnPcts, 2))
+```
+```{r echo=TRUE, tidy=TRUE}
+ProjectData_SegmentSummary = ProjectData_SegmentStats[,c(1:2)]
+ProjectData_SegmentSummary[,"%ofCompany"] = ProjectData_SegmentSummary[,"Total"]/sum(ProjectData_SegmentSummary[,"Total"])*100
+ProjectData_SegmentSummary[1,"Churned"] = sum(ProjectData_SegmentChurnStats[1,c(3:11)])
+ProjectData_SegmentSummary[2,"Churned"] = sum(ProjectData_SegmentChurnStats[2,c(3:11)])
+ProjectData_SegmentSummary[3,"Churned"] = sum(ProjectData_SegmentChurnStats[3,c(3:11)])
+ProjectData_SegmentSummary[,"Churn%ofTotal"] = ProjectData_SegmentSummary[,"Churned"]/ProjectData_SegmentSummary[,"Total"]*100
+iprint.df(round(ProjectData_SegmentSummary, 2))
+
+```
+
+
+## Classification
+#### Predictive machine learning (artificial stupidity)
+```{r setupclassification, echo=TRUE, tidy=TRUE}
+# Please ENTER the class (dependent) variable:
+# Please use numbers, not column names! e.g. 82 uses the 82nd column are dependent variable.
+# YOU NEED TO MAKE SURE THAT THE DEPENDENT VARIABLES TAKES ONLY 2 VALUES: 0 and 1!!!
+
+ProjectDataLeft = ProjectData[,7]
+ProjectDataClass <- cbind(ProjectData2_scaled,ProjectDataLeft)
+dependent_variable= 17
+
+# Please ENTER the attributes to use as independent variables 
+
+independent_variables= c(1:16) 
+
+# Please ENTER the profit/cost values for the correctly and wrong classified data:
+#actual_1_predict_1 = 100
+#actual_1_predict_0 = -75
+#actual_0_predict_1 = -50
+#actual_0_predict_0 = 0
+
+# Please ENTER the probability threshold above which an observations  
+# is predicted as class 1:
+Probability_Threshold=50 # between 1 and 99%
+
+# Please ENTER the percentage of data used for estimation
+estimation_data_percent = 80
+validation_data_percent = 10
+
+# Please enter 0 if you want to "randomly" split the data in estimation and validation/test
+random_sampling = 0
+
+# Tree parameter
+# PLEASE ENTER THE Tree (CART) complexity control cp (e.g. 0.001 to 0.02, depending on the data)
+CART_cp = 0.001
+
+# Please enter the minimum size of a segment for the analysis to be done only for that segment
+min_segment = 1000
+```
+
+```{r}
+ProjectDataClass = ProjectDataClass # Just to initialize the data
+
+Probability_Threshold = Probability_Threshold/100 # make it between 0 and 1
+
+dependent_variable = unique(sapply(dependent_variable,function(i) min(ncol(ProjectData), max(i,1))))
+independent_variables = unique(sapply(independent_variables,function(i) min(ncol(ProjectData), max(i,1))))
+
+if (length(unique(ProjectData[,dependent_variable])) !=2){
+  cat("\n*****\n BE CAREFUL, THE DEPENDENT VARIABLE TAKES MORE THAN 2 VALUES...")
+  cat("\nSplitting it around its median...\n*****\n ")
+  new_dependent = ProjectDataClass[,dependent_variable] >= median(ProjectDataClass[,dependent_variable])
+  ProjectDataClass[,dependent_variable] <- 1*new_dependent
+}
+
+#Profit_Matrix = matrix(c(actual_1_predict_1, actual_0_predict_1, actual_1_predict_0, actual_0_predict_0), ncol=2)
+#colnames(Profit_Matrix)<- c("Predict 1", "Predict 0")
+#rownames(Profit_Matrix) <- c("Actual 1", "Actual 0")
+test_data_percent = 100-estimation_data_percent-validation_data_percent
+CART_control = rpart.control(cp = CART_cp)
+```
+
+
+We will use two classification trees and logistic regression. You can select "complexity" control for one of the classification trees in the code chunk of the raw .Rmd file here
+
+```{r CART_control, echo=TRUE, tidy=TRUE}
+CART_control = 0.001
+```
+
+
+
+This is a "small tree" classification for example:
+
+```{r}
+# FIrst we split the data in estimation, validation, and test
+
+if (random_sampling){
+  estimation_data_ids=sample.int(nrow(ProjectDataClass),floor(estimation_data_percent*nrow(ProjectDataClass)/100))
+  non_estimation_data = setdiff(1:nrow(ProjectDataClass),estimation_data_ids)
+  validation_data_ids=non_estimation_data[sample.int(length(non_estimation_data), floor(validation_data_percent/(validation_data_percent+test_data_percent)*length(non_estimation_data)))]
+  } else {
+    estimation_data_ids=1:floor(estimation_data_percent*nrow(ProjectData)/100)
+    non_estimation_data = setdiff(1:nrow(ProjectDataClass),estimation_data_ids)
+    validation_data_ids = (tail(estimation_data_ids,1)+1):(tail(estimation_data_ids,1) + floor(validation_data_percent/(validation_data_percent+test_data_percent)*length(non_estimation_data)))
+    }
+
+test_data_ids = setdiff(1:nrow(ProjectDataClass), union(estimation_data_ids,validation_data_ids))
+
+estimation_data=ProjectDataClass[estimation_data_ids,]
+validation_data=ProjectDataClass[validation_data_ids,]
+test_data=ProjectDataClass[test_data_ids,]
+```
+
+```{r}
+# just name the variables numerically so that they look ok on the tree plots
+independent_variables_nolabel = paste("IV", 1:length(independent_variables), sep="")
+
+estimation_data_nolabel = cbind(estimation_data[,dependent_variable], estimation_data[,independent_variables])
+colnames(estimation_data_nolabel)<- c(colnames(estimation_data)[dependent_variable],independent_variables_nolabel)
+
+validation_data_nolabel = cbind(validation_data[,dependent_variable], validation_data[,independent_variables])
+colnames(validation_data_nolabel)<- c(dependent_variable,independent_variables_nolabel)
+
+test_data_nolabel = cbind(test_data[,dependent_variable], test_data[,independent_variables])
+colnames(test_data_nolabel)<- c(dependent_variable,independent_variables_nolabel)
+
+estimation_data_nolabel = data.frame(estimation_data_nolabel)
+validation_data_nolabel = data.frame(validation_data_nolabel)
+test_data_nolabel = data.frame(test_data_nolabel)
+
+estimation_data = data.frame(estimation_data)
+validation_data = data.frame(validation_data)
+test_data = data.frame(test_data)
+```
+
+```{r}
+formula=paste(colnames(estimation_data)[dependent_variable],paste(Reduce(paste,sapply(head(independent_variables_nolabel,-1), function(i) paste(i,"+",sep=""))),tail(independent_variables_nolabel,1),sep=""),sep="~")
+CART_tree<-rpart(formula, data= estimation_data_nolabel,method="class", control=CART_control)
+
+rpart.plot(CART_tree, box.palette="OrBu", type=3, extra=1, fallen.leaves=F, branch.lty=3)
+```
+
+```{r}
+CART_tree_large<-rpart(formula, data= estimation_data_nolabel,method="class", control=rpart.control(cp = 0.005))
+```
+
+```{r}
+# Let's first calculate all probabilites for the estimation, validation, and test data
+estimation_Probability_class1_tree<-predict(CART_tree, estimation_data_nolabel)[,2]
+estimation_Probability_class1_tree_large<-predict(CART_tree_large, estimation_data_nolabel)[,2]
+
+validation_Probability_class1_tree<-predict(CART_tree, validation_data_nolabel)[,2]
+validation_Probability_class1_tree_large<-predict(CART_tree_large, validation_data_nolabel)[,2]
+
+test_Probability_class1_tree<-predict(CART_tree, test_data_nolabel)[,2]
+test_Probability_class1_tree_large<-predict(CART_tree_large, test_data_nolabel)[,2]
+
+
+estimation_prediction_class_tree=1*as.vector(estimation_Probability_class1_tree > Probability_Threshold)
+estimation_prediction_class_tree_large=1*as.vector(estimation_Probability_class1_tree_large > Probability_Threshold)
+
+validation_prediction_class_tree=1*as.vector(validation_Probability_class1_tree > Probability_Threshold)
+validation_prediction_class_tree_large=1*as.vector(validation_Probability_class1_tree_large > Probability_Threshold)
+
+test_prediction_class_tree=1*as.vector(test_Probability_class1_tree > Probability_Threshold)
+test_prediction_class_tree_large=1*as.vector(test_Probability_class1_tree_large > Probability_Threshold)
+```
+
+```{r}
+formula_log=paste(colnames(estimation_data[,dependent_variable,drop=F]),paste(Reduce(paste,sapply(head(independent_variables,-1), function(i) paste(colnames(estimation_data)[i],"+",sep=""))),colnames(estimation_data)[tail(independent_variables,1)],sep=""),sep="~")
+
+logreg_solution <- glm(formula_log, family=binomial(link="logit"),  data=estimation_data)
+
+log_coefficients = round(summary(logreg_solution)$coefficients,1)
+```
+
+```{r}
+estimation_Probability_class1_log<-predict(logreg_solution, type="response", newdata=estimation_data[,independent_variables])
+validation_Probability_class1_log<-predict(logreg_solution, type="response", newdata=validation_data[,independent_variables])
+test_Probability_class1_log<-predict(logreg_solution, type="response", newdata=test_data[,independent_variables])
+
+estimation_prediction_class_log=1*as.vector(estimation_Probability_class1_log > Probability_Threshold)
+validation_prediction_class_log=1*as.vector(validation_Probability_class1_log > Probability_Threshold)
+test_prediction_class_log=1*as.vector(test_Probability_class1_log > Probability_Threshold)
+```
+
+After also running the large tree and the logistic regression classifiers, we can then check how much "weight" these three methods put on the different churn drivers:
+
+```{r}
+log_importance = tail(log_coefficients[,"z value", drop=F],-1) # remove the intercept
+log_importance = log_importance/max(abs(log_importance))
+
+tree_importance = CART_tree$variable.importance
+tree_ordered_drivers = as.numeric(gsub("\\IV"," ",names(CART_tree$variable.importance)))
+tree_importance_final = rep(0,length(independent_variables))
+tree_importance_final[tree_ordered_drivers] <- tree_importance
+tree_importance_final <- tree_importance_final/max(abs(tree_importance_final))
+tree_importance_final <- tree_importance_final*sign(log_importance)
+
+large_tree_importance = CART_tree_large$variable.importance
+large_tree_ordered_drivers = as.numeric(gsub("\\IV"," ",names(CART_tree_large$variable.importance)))
+large_tree_importance_final = rep(0,length(independent_variables))
+large_tree_importance_final[large_tree_ordered_drivers] <- large_tree_importance
+large_tree_importance_final <- large_tree_importance_final/max(abs(large_tree_importance_final))
+large_tree_importance_final <- large_tree_importance_final*sign(log_importance)
+
+Importance_table <- cbind(tree_importance_final,large_tree_importance_final, log_importance)
+colnames(Importance_table) <- c("CART 1", "CART 2", "Logistic Regr.")
+rownames(Importance_table) <- rownames(log_importance)
+
+iprint.df(Importance_table)
+```
+
+
+##Validation accuracy 
+
+Using the predicted class probabilities  of the validation data, as outlined above, we can  generate four basic measures of classification performance. Before discussing them, note that given the probability an observation belongs to a class, **a reasonable class prediction choice is to predict the class that has the highest probability**. However, this does not need to be the only choice in practice.
+
+> Selecting the probability threshold based on which we predict the class of an observation is a decision the user needs to make. While in some cases a reasonable probability threshold is 50%, in other cases it may be 99.9% or 0.01%. Can you think of such cases?
+
+For different choices of the probability threshold, one can measure a number of classification performance metrics, which are outlined next. 
+
+#### 1.  Hit ratio
+This is simply the percentage of the observations that have been correctly classified (the predicted is the same as the actual class). We can just count the number of the (first) validation data correctly classified and divide this number with the total number of the (fist) validation data, using the two CART and the logistic regression above. These are as follows for the probability threshold  `r Probability_Threshold*100`% for the validation data:
+
+```{r}
+validation_actual=validation_data[,dependent_variable]
+validation_predictions = rbind(validation_prediction_class_tree,
+                               validation_prediction_class_tree_large,
+                               validation_prediction_class_log)
+validation_hit_rates = rbind(
+  100*sum(validation_prediction_class_tree==validation_actual)/length(validation_actual), 
+  100*sum(validation_prediction_class_tree_large==validation_actual)/length(validation_actual), 
+  100*sum(validation_prediction_class_log==validation_actual)/length(validation_actual)
+  )
+colnames(validation_hit_rates) <- "Hit Ratio"
+rownames(validation_hit_rates) <- c("First CART", "Second CART", "Logistic Regression")
+knitr::kable(validation_hit_rates)
+```
+
+while for the estimation data the hit rates are:
+```{r}
+estimation_actual=estimation_data[,dependent_variable]
+estimation_predictions = rbind(estimation_prediction_class_tree,
+                               estimation_prediction_class_tree_large,
+                               estimation_prediction_class_log)
+estimation_hit_rates = rbind(
+  100*sum(estimation_prediction_class_tree==estimation_actual)/length(estimation_actual), 
+  100*sum(estimation_prediction_class_tree_large==estimation_actual)/length(estimation_actual), 
+  100*sum(estimation_prediction_class_log==estimation_actual)/length(estimation_actual)
+  )
+colnames(estimation_hit_rates) <- "Hit Ratio"
+rownames(estimation_hit_rates) <- c("First CART", "Second CART", "Logistic Regression")
+knitr::kable(estimation_hit_rates)
+```
+
+**Why are the performances on the estimation and validation data different? How different can they possibly be? What does this diffference depend on?** Is the Validation Data Hit Rate satisfactory? Which classifier should we use? What should be the benchmark against which to compare the hit rate? 
+
+A simple benchmark to compare the performance of a classification model against is the **Maximum Chance Criterion**. This measures the proportion of the class with the largest size. For our validation data the largest group is people who do not intent do purchase a boat: `r sum(!validation_actual)` out of `r length(validation_actual)` people). Clearly without doing any discriminant analysis, if we classified all individuals into the largest group,  we could get a hit-rate of `r round(100*sum(!validation_actual)/length(validation_actual), 2)`% - without doing any work. One should have a hit rate of at least as much as the the Maximum Chance Criterion rate, although as we discuss next there are more performance criteria to consider. 
+
+#### 2. Confusion matrix
+
+The confusion matrix shows for each class the number (or percentage) of the  data that are correctly classified for that class. For example for the method above with the highest hit rate in the validation data (among logistic regression and the 2 CART models), the confusion matrix for the validation data is:
+
+```{r}
+validation_prediction_best = validation_predictions[which.max(validation_hit_rates),]
+conf_matrix = matrix(rep(0,4),ncol=2)
+conf_matrix[1,1]<- 100*sum(validation_prediction_best*validation_data[,dependent_variable])/sum(validation_data[,dependent_variable])
+conf_matrix[1,2]<- 100*sum((!validation_prediction_best)*validation_data[,dependent_variable])/sum(validation_data[,dependent_variable])
+conf_matrix[2,1]<- 100*sum((!validation_prediction_best)*(!validation_data[,dependent_variable]))/sum((!validation_data[,dependent_variable]))
+conf_matrix[2,2]<- 100*sum((validation_prediction_best)*(!validation_data[,dependent_variable]))/sum((!validation_data[,dependent_variable]))
+conf_matrix = round(conf_matrix,2)
+
+colnames(conf_matrix) <- c("Predicted 1", "Predicted 0")
+rownames(conf_matrix) <- c("Actual 1", "Actual 0")
+knitr::kable(conf_matrix)
+```
+
+Note that the percentages add up to 100% for each row: can you see why? Moreover, a "good" confusion matrix should have large diagonal values and small off-diagonal oens: you see why?
+
+#### 3. ROC curve
+
+Remember that each observation is classified by our model according to the probabilities Pr(0) and Pr(1) and a chosen probability threshold. Typically we set the probability threshold to 0.5 - so that observations for which Pr(1) > 0.5 are classified as 1's. However, we can vary this threshold, for example if we are interested in correctly predicting all 1's but do not mind missing some 0's (and vice-versa) - can you think of such a scenario? 
+
+When we change the probability threshold we get different values of hit rate, false positive and false negative rates, or any other performance metric. We can plot for example how the false positive versus true posititive rates change as we alter the probability threshold,  and generate the so called ROC curve. 
+
+The ROC curves for the validation data for both the CARTs above as well as the logistic regression are as follows:
+
+```{r}
+validation_actual_class <- as.numeric(validation_data[,dependent_variable])
+
+pred_tree <- prediction(validation_Probability_class1_tree, validation_actual_class)
+pred_tree_large <- prediction(validation_Probability_class1_tree_large, validation_actual_class)
+pred_log <- prediction(validation_Probability_class1_log, validation_actual_class)
+
+test1<-performance(pred_tree, "tpr", "fpr")
+df1<- cbind(as.data.frame(test1@x.values),as.data.frame(test1@y.values))
+colnames(df1) <- c("False Positive rate CART 1", "True Positive CART 1")
+plot1 <- ggplot(df1, aes(x=`False Positive rate CART 1`, y=`True Positive CART 1`)) + geom_line()
+test2<-performance(pred_log, "tpr", "fpr")
+df2<- cbind(as.data.frame(test2@x.values),as.data.frame(test2@y.values))
+colnames(df2) <- c("False Positive rate log reg", "True Positive log reg")
+plot2 <- ggplot(df2, aes(x=`False Positive rate log reg`, y=`True Positive log reg`)) + geom_line()
+test3<-performance(pred_tree_large, "tpr", "fpr")
+df3<- cbind(as.data.frame(test3@x.values),as.data.frame(test3@y.values))
+colnames(df3) <- c("False Positive rate CART 2", "True Positive CART 2")
+plot3 <- ggplot(df3, aes(x=`False Positive rate CART 2`, y=`True Positive CART 2`)) + geom_line()
+
+# we can plot the curves individually here, but we're going to combine them below, instead
+# grid.arrange(plot1, plot2, plot3)   # use `fig.height=7.5` for the grid plot
+
+df.all <- do.call(rbind, lapply(list(df1, df2, df3), function(df) {
+  df <- melt(df, id=1)
+  df$variable <- sub("True Positive ", "", df$variable)
+  colnames(df)[1] <- "False Positive rate"
+  df
+}))
+ggplot(df.all, aes(x=`False Positive rate`, y=value, colour=variable)) + geom_line() + ylab("True Positive rate")
+```
+
+How should a good ROC curve look like? A rule of thumb in assessing ROC curves is that the "higher" the curve, hence the larger the area under the curve, the better. You may also select one point on the ROC curve (the "best one" for our purpose) and use that false positive/false negative performances (and corresponding threshold for P(0)) to assess your model. **Which point on the ROC should we select?**
+
+#### 4. Lift curve
+
+By changing the probability threshold, we can also generate the so called lift curve, which is useful for certain applications e.g. in marketing or credit risk. For example, consider the case of capturing fraud by examining only a few transactions instead of every single one of them. In this case we may want to examine as few transactions as possible and capture the maximum number of frauds possible. We can measure the percentage of all frauds we capture if we only examine, say, x% of cases (the top x% in terms of Probability(fraud)). If we plot these points [percentage of class 1 captured vs percentage of all data examined] while we change the threshold, we get a curve that is called the **lift curve**. 
+
+The Lift curves for the validation data for our three classifiers are the following:
+
+```{r}
+validation_actual <- validation_data[,dependent_variable]
+all1s <- sum(validation_actual); 
+
+probs <- validation_Probability_class1_tree
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= 1-prob)
+  c(length(useonly)/length(validation_actual), sum(validation_actual[useonly])/all1s) 
+}))
+frame1 <- data.frame(
+  `CART 1 % of validation data` = res[1,],
+  `CART 1 % of class 1` = res[2,],
+  check.names = FALSE
+)
+plot1 <- ggplot(frame1, aes(x=`CART 1 % of validation data`, y=`CART 1 % of class 1`)) + geom_line()
+
+probs <- validation_Probability_class1_tree_large
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= 1-prob)
+  c(length(useonly)/length(validation_actual), sum(validation_actual[useonly])/all1s) 
+}))
+frame2 <- data.frame(
+  `CART 2 % of validation data` = res[1,],
+  `CART 2 % of class 1` = res[2,],
+  check.names = FALSE
+)
+plot2 <- ggplot(frame2, aes(x=`CART 2 % of validation data`, y=`CART 2 % of class 1`)) + geom_line()
+
+probs <- validation_Probability_class1_log
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= prob)
+  c(length(useonly)/length(validation_actual), sum(validation_actual[useonly])/all1s) 
+}))
+frame3 <- data.frame(
+  `log reg % of validation data` = res[1,],
+  `log reg % of class 1` = res[2,],
+  check.names = FALSE
+)
+plot3 <- ggplot(frame3, aes(x=`log reg % of validation data`, y=`log reg % of class 1`)) + geom_line()
+
+# we can plot the curves individually here, but we're going to combine them below, instead
+# grid.arrange(plot1, plot2, plot3)   # use `fig.height=7.5` for the grid plot
+
+df.all <- do.call(rbind, lapply(list(frame1, frame2, frame3), function(df) {
+  df <- melt(df, id=1)
+  df$variable <- sub(" % of class 1", "", df$variable)
+  colnames(df)[1] <- "Percent of validation data"
+  df
+}))
+ggplot(df.all, aes(x=`Percent of validation data`, y=value, colour=variable)) + geom_line() + ylab("Percent of class 1")
+```
+
+How should a good Lift Curve look like? Notice that if we were to randomly examine transactions, **the "random prediction" lift curve would be a 45 degrees straight diagonal line** (why?)! So the further **above** this 45 degrees line our Lift curve is, the better the "lift". Moreover, much like for the ROC curve, one can select the probability threshold appropriately so that any point of the lift curve is selected. **Which point on the lift curve should we select in practice?** 
+
+
+
+#### Step 6: Test Accuracy
+
+Having iterated steps 2-5 until we are satisfyed with the performance of our selected model on the validation data, in this step the performance analysis outlined in step 5 needs to be done with the test sample. This is the performance that "best mimics" what one should expect in practice upon deployment of the classification solution, **assuming (as always) that the data used for this performance analysis are representative of the situation in which the solution will be deployed.** 
+
+Let's see in our case how the **Confusion Matrix, ROC Curve, Lift Curve, and Profit Curve** look like for our test data. **Will the performance in the test data be similar to the performance in the  validation data above? More important: should we expect the performance of our classification model to be close to that in our test data when we deploy the model in practice? Why or why not? What should we do if they are different?**
+
+```{r}
+######for train data#####
+test_actual=test_data[,dependent_variable]
+test_predictions = rbind(test_prediction_class_tree,
+                         test_prediction_class_tree_large,
+                         test_prediction_class_log)
+test_hit_rates = rbind(
+  100*sum(test_prediction_class_tree==test_actual)/length(test_actual), 
+  100*sum(test_prediction_class_tree_large==test_actual)/length(test_actual), 
+  100*sum(test_prediction_class_log==test_actual)/length(test_actual)
+  )
+colnames(test_hit_rates) <- "Hit Ratio"
+rownames(test_hit_rates) <- c("First CART", "Second CART", "Logistic Regression")
+
+knitr::kable(test_hit_rates)
+```
+
+The Confusion Matrix for the model with the best validation data hit ratio above:
+
+```{r echo=FALSE, message=FALSE, prompt=FALSE, results='asis'}
+test_prediction_best = test_predictions[which.max(validation_hit_rates),]
+conf_matrix = matrix(rep(0,4),ncol=2)
+conf_matrix[1,1]<- 100*sum(test_prediction_best*test_data[,dependent_variable])/sum(test_data[,dependent_variable])
+conf_matrix[1,2]<- 100*sum((!test_prediction_best)*test_data[,dependent_variable])/sum(test_data[,dependent_variable])
+conf_matrix[2,1]<- 100*sum((!test_prediction_best)*(!test_data[,dependent_variable]))/sum((!test_data[,dependent_variable]))
+conf_matrix[2,2]<- 100*sum((test_prediction_best)*(!test_data[,dependent_variable]))/sum((!test_data[,dependent_variable]))
+conf_matrix = round(conf_matrix,2)
+
+colnames(conf_matrix) <- c("Predicted 1", "Predicted 0")
+rownames(conf_matrix) <- c("Actual 1", "Actual 0")
+knitr::kable(conf_matrix)
+```
+
+ROC curves for the test data:
+
+```{r}
+test_actual_class <- as.numeric(test_data[,dependent_variable])
+
+pred_tree_test <- prediction(test_Probability_class1_tree, test_actual_class)
+pred_tree_large_test <- prediction(test_Probability_class1_tree_large, test_actual_class)
+pred_log_test <- prediction(test_Probability_class1_log, test_actual_class)
+
+test<-performance(pred_tree_test, "tpr", "fpr")
+df1<- cbind(as.data.frame(test@x.values),as.data.frame(test@y.values))
+colnames(df1) <- c("False Positive rate CART 1", "True Positive CART 1")
+test2<-performance(pred_tree_large_test, "tpr", "fpr")
+df2<- cbind(as.data.frame(test2@x.values),as.data.frame(test2@y.values))
+colnames(df2) <- c("False Positive rate CART 2", "True Positive CART 2")
+test3<-performance(pred_log_test, "tpr", "fpr")
+df3<- cbind(as.data.frame(test1@x.values),as.data.frame(test1@y.values))
+colnames(df3) <- c("False Positive rate log reg", "True Positive log reg")
+
+df.all <- do.call(rbind, lapply(list(df1, df2, df3), function(df) {
+  df <- melt(df, id=1)
+  df$variable <- sub("True Positive ", "", df$variable)
+  colnames(df)[1] <- "False Positive rate"
+  df
+}))
+ggplot(df.all, aes(x=`False Positive rate`, y=value, colour=variable)) + geom_line() + ylab("True Positive rate")
+```
+
+Lift Curves for the test data:
+
+```{r}
+test_actual <- test_data[,dependent_variable]
+all1s <- sum(test_actual)
+
+probs <- test_Probability_class1_tree
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= 1-prob)
+  c(length(useonly)/length(test_actual), sum(test_actual[useonly])/all1s) 
+}))
+frame1 <- data.frame(
+  `CART 1 % of validation data` = res[1,],
+  `CART 1 % of class 1` = res[2,],
+  check.names = FALSE
+)
+
+probs <- test_Probability_class1_tree_large
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= 1-prob)
+  c(length(useonly)/length(test_actual), sum(test_actual[useonly])/all1s) 
+}))
+frame2 <- data.frame(
+  `CART 2 % of validation data` = res[1,],
+  `CART 2 % of class 1` = res[2,],
+  check.names = FALSE
+)
+
+probs <- test_Probability_class1_log
+xaxis <- sort(unique(c(0,1,probs)), decreasing = TRUE)
+res <- 100*Reduce(cbind,lapply(xaxis, function(prob){
+  useonly <- which(probs >= 1-prob)
+  c(length(useonly)/length(test_actual), sum(test_actual[useonly])/all1s) 
+  }))
+frame3 <- data.frame(
+  `log reg % of validation data` = res[1,],
+  `log reg % of class 1` = res[2,],
+  check.names = FALSE
+)
+
+df.all <- do.call(rbind, lapply(list(frame1, frame2, frame3), function(df) {
+  df <- melt(df, id=1)
+  df$variable <- sub(" % of class 1", "", df$variable)
+  colnames(df)[1] <- "Percent of test data"
+  df
+}))
+ggplot(df.all, aes(x=`Percent of test data`, y=value, colour=variable)) + geom_line() + ylab("Percent of class 1")
+```
+
+
+
+## Executive summary and final conclusions
+We entered this analysis with the goal of understanding what the main drivers for employee churn are. Starting from the raW GOLDHR data set, we first conducted descriptive statistics and created a general correlation matrix to get a better understanding of the data that we were dealing with.
+<br><br>
+Once we were comfortable with the data, we discovered the most important components of this data (i.e., satisfaction level, amount of work, tenure), and reduced the dimensions of the data set to these important components.
+<br><br> 
+From there we were able to arrive at three distinct segments: Fresh and Happy, who comprise a vast majority of the population and are satisfied with their current standing; Overworked employees who have too many projects and are unhappy about it; and the Unchallenged employees whose workload is disproportionately lax and are unhappy about it. These latter two segments comprise 98% of churned employees.
+<br><br>
+In sum, we conclude that by and large the most significant factor that drives employee churn is whether that person is happy or not in the company. Though this my seem obvious, what we found striking about our analysis was how little the other factors contributed to churn relative to employee satisfaction. For example, at first blush we hypothesized that salary might be a major factor for leaving, but employees were quite indifferent to it. Furthermore, we discovered that an employee's satisfaction has very little to do with what department he or she belongs to. Yes, workload was a factor, but paled in comparison to happiness as a whole.
+<br><br> 
+In this light, we believe the next step for this case is clear. We already know that satisfaction drives retention, so it only makes sense that we have to understand in more detail what drives satisfaction. To do so, we would recommend re-running a similar analysis as above, this time omitting "left" from the study, and instead using "satisfaction_level" as the new dependent variable. We already have some proclivities to what the results may show, as the correlation matrix above shows that projects, tenure, and hours have a high correlation coefficient with satisfaction. Still, it would behoove us to confirm this hypothesis by properly going through the same process we conducted above.
+=======
+
+
