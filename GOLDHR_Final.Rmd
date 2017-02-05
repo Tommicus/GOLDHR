@@ -1,7 +1,7 @@
 ---
 title: "GOLDHR"
 author: "GroupVAHAC"
-date: "1/26/2017"
+date: "2/05/2017"
 output: html_document
 ---
 
@@ -50,7 +50,7 @@ We decided to analyse HR data about various metrics related to employees. We too
 We picked the underlying data set for the following reasons: it had a considerable number of observations (14,998) and a manageable number of factors (19). This will ease the process of dimensionality reduction, while providing sufficient basis for a meaningful segmentation. The factors include a complete set of characteristics: demographics, performance levels, one/off “dummy” variables. Therefore, we will be able to study the interactions between different kinds of factors.
 <br><br>
 The factors included in the dataset are:
-<br>* Satisfaction level (0-1) - Our dependent variable
+<br>* Satisfaction level (0-1)
 <br>* Last valuation (0-1) - The score received during performance review
 <br>* Number of projects in which the employee was engaged
 <br>* Average monthly hours worked
@@ -232,7 +232,7 @@ iprint.df(Rotated_Factors, scale=TRUE)
 
 ## Segmentation
 <br>
-From the above exercise, we have established four key components, as well as the attributes that best associate with these components. We can infer from the data that each of the components refers to the following:
+From the above exercise, we have established three key components, as well as the attributes that best associate with these components. We can infer from the data that each of the components refers to the following:
 <br>
 <br>Comp.1: Care about the work 
 <br>Comp.2: Satisfaction with the company
@@ -240,6 +240,7 @@ From the above exercise, we have established four key components, as well as the
 <br><br>
 Using these components, we can now begin our segmentation.
 <br><br>
+
 #### Set Input Variables
 ```{r setupcluster, echo=TRUE, tidy=TRUE}
 # Select Attributes to use
@@ -268,11 +269,11 @@ kmeans_method = "Lloyd"
 
 ```
 <br>
-First, we selected our segmentation attributes by taking the attributes that most resonate with each of the four components. Specifically, we used satisfaction_level (table column 1, component 2), average_monthly_hours (table column 4, component 1), and promotion_last_5_years (table column 8, component 3) to represent components 1, 2, and 3 respectively.
+First, we selected our segmentation attributes by taking the attributes that most resonate with each of the three components. Specifically, we used satisfaction_level (table column 1, component 2), average_monthly_hours (table column 4, component 1), and promotion_last_5_years (table column 8, component 3) to represent components 1, 2, and 3 respectively.
 <br><br>
 Next, for profile_attributes_used, we included all the columns (our eight factors stated above) in the data set, per standard procedure.
 <br><br>
-For the number of segments used, we conducted a number of trials to arrive at the appropriate number of segments that were clearly distinct from each other. We started with 5, but noticed that while four segments were highly differentiated, there was one segment that had no attributes that they strongly represented. Thus, we tried narrowing the segments to 4, and noticed still some errant clusters. Once we brought it down to 3, we finally reached three unique, highly differentiated segments This is the number we used for our segmentation method.
+For the number of segments used, we conducted a number of trials to arrive at the appropriate number of segments that were clearly distinct from each other. We started with 5, but noticed that while four segments were highly differentiated, there was one segment that had no attributes that they strongly represented. Thus, we tried narrowing the segments to 4, and noticed still some errant clusters. Once we brought it down to 3, we finally reached three unique, highly differentiated segments. This is the number we used for our segmentation method.
 <br><br>
 Finally, we used a Kmeans-Lloyd segmentation method.
 <br>
@@ -302,7 +303,7 @@ colnames(ProjectData_with_kmeans_membership)<-c("Empl.Nr","Cluster_Membership")
 iprint.df(round(head(ProjectData_with_kmeans_membership, max_data_report), 2))
 ```
 <br>
-Using the above algorithm, we plotted which employees would fall under the three segments we declared. Here we have a sample of employees, and we see a fairly non-biased distribution of across segments.
+Using the above algorithm, we plotted which employees would fall under the three segments we declared. Here we have a sample of employees, and we see a fairly non-biased distribution across segments.
 
 #### Segment comparison to mean
 
@@ -359,9 +360,9 @@ iplot.df(melt(cbind.data.frame(idx=as.numeric(1:nrow(Cluster_Profile_standar_mea
 Here we see in greater detail how each segment of employees values or de-values some of our key attributes. This gives us more information on the nature of each of the segment profiles. Based on the table above and graph above, we interprete the segments as follows: 
 <br>* The "Fresh&Happy" Segment has very high satisfaction levels, employees are relatively new to the company, and have a slightly higher salary than the average. 
 <br>* The "Unchallenged" Segment is characterized by few projects, few monthly hours, and low evaluations. They generally have low satisfaction levels.
-<br>* The "Overworked" Segment is characterized by long hours and many projects. Employees have generally high evaluations and spend a significant time in the company already. Satisfaction level is low.
+<br>* The "Overworked" Segment is characterized by long hours and many projects. Employees have generally high evaluations and spent a significant time in the company already. Satisfaction level is low.
 <br><br>
-Our best guess based on the data and our interpretation is that low satisfaction is triggered by either either being unchallenged or overworked. However, the next step in the analysis could be to check whether this hypothesis is correct, by running a regression of the Satisfaction level with other factors.
+Our best guess based on the data and our interpretation is that low satisfaction is triggered by either being unchallenged or overworked. However, the next step in the analysis could be to check whether this hypothesis is correct, by running a regression of the Satisfaction level with other factors.
 <br><br>
 As already anticipated when looking at the correlation analysis, we now see that salary promotion and work accident cannnot be used as attributes for segmentation as they are equally important or not important across employees in all segments. All three segments show numbers that are very close to the average of the total population.
 
@@ -370,7 +371,7 @@ As already anticipated when looking at the correlation analysis, we now see that
 
 We observed before that the correlation between the variables and the Department, in which a person works, was close to 0. However, we wanted to cross-check if segments may be profiled by the departments. <br>
 The first table shows the number of people of each segment employed in each department.
-From the second table, we can see that, despite being different in size, the departments are equally represented in the segments in % term. Basically, every department has the same share of people of the same segment. These numbers appear to be almost too close: this may be a potential red flag about the quality (potential lack of randombess) of the data base.
+From the second table, we can see that, despite being different in size, the departments are equally represented in the segments in % term. Basically, every department has the same share of people of the same segment. These numbers appear to be almost too close: this may be a potential red flag about the quality (potential lack of randomness) of the data base.
 
 ```{r echo=TRUE, tidy=TRUE}
 ProjectData_Departments <- ProjectData[,c(7,10:17)]
@@ -518,7 +519,7 @@ ProjectData_SegmentPcts = newintermediatetable[,c(1,2,12:20)]
 
 iprint.df(round(ProjectData_SegmentPcts, 2))
 ```
-The next two tables limit the number of employees in each segment to those who left the company. We see that the majority of the employees, the "Fresh&Happy" Segment, shows a very low turn rate, while the turn rate is high for the other two segments (please note that the "Fresh&Happy" Segment could be partially biased because employees are rather new in the company and consequently did not have too much time to leave yet.) The "Overworked" Segment shows the highest turnrate.
+The next two tables limit the number of employees in each segment to those who left the company. We see that the majority of the employees, the "Fresh&Happy" Segment, shows a very low turnover rate, while the turnover rate is high for the other two segments (please note that the "Fresh&Happy" Segment could be partially biased because employees are rather new in the company and consequently did not have too much time to leave yet.) The "Overworked" Segment shows the highest turnrate.
 ```{r echo=TRUE, tidy=TRUE}
 
 resultstable = NULL
@@ -616,9 +617,7 @@ rownames(ProjectData_SegmentChurnStats)[2] <- "Overworked"
 rownames(ProjectData_SegmentChurnStats)[3] <- "Unchallenged"
 iprint.df(round(ProjectData_SegmentChurnStats, 1))
 ```
-The summary table below shows the segment, the total number of employees that where grouped into this segment, the segment size compared to the total number of employees in the company (int the database), the number of people who left the company and the the churn rate calculated by people who left devided by the total number of people in this segment.
-<br><br>
-As mentioned above, when implementing measures to decrease the company's churn rate, one should not focus too much on the "Fresh&Happy" Segment, while being very concerned about the other two segments, which show high rates.
+
 ```{r echo=TRUE, tidy=TRUE}
 
 newintermediatetable= cbind(ProjectData_SegmentStats,ProjectData_SegmentChurnStats[,3:11])
@@ -645,6 +644,9 @@ ProjectData_SegmentChurnPcts = newintermediatetable[,c(21:29)]*100
 
 iprint.df(round(ProjectData_SegmentChurnPcts, 2))
 ```
+The summary table below shows the segment, the total number of employees that where grouped into this segment, the segment size compared to the total number of employees in the company (in the database), the number of people who left the company and the churn rate calculated by people who left divided by the total number of people in this segment.
+<br><br>
+As mentioned above, when implementing measures to decrease the company's churn rate, one should not focus too much on the "Fresh&Happy" Segment, while being very concerned about the other two segments, which show high rates.
 ```{r echo=TRUE, tidy=TRUE}
 ProjectData_SegmentSummary = ProjectData_SegmentStats[,c(1:2)]
 ProjectData_SegmentSummary[,"%ofCompany"] = ProjectData_SegmentSummary[,"Total"]/sum(ProjectData_SegmentSummary[,"Total"])*100
@@ -662,53 +664,36 @@ iprint.df(round(ProjectData_SegmentSummary, 2))
 ####Note on classification analysis below:
 We used the code from the course website, adjusting for our data set and our problem
 
-The CART1, CART2 and Logistic Regr. return a -1.00 in the variable importance for the first independent variable (Satisfaction level in our base case) in the set (we tried multiple independent variables)
+The CART1, CART2 and Logistic Regr. return a -1.00 in the variable importance for the first independent variable (Satisfaction level in our base case) in the set (we tried multiple independent variables).
 
 The confusion matrix (validation) returns a huge Type 1 error (99.58%) (people staying although we predicted them to leave) but a relatively small Type 2 error (8.43%). If we increase the probability threshold, the Type 1 error doesn’t decrease which is counter intuitive.
 
 For the Test Accuracy confusion matrix the result is pretty much the same.
 
-We assumed that one reason can be that some of the coefficients for the logistic regression may not be significant. If we exclude them the results are still very similar. The logistic regression produces a lot of mistakes.
+We assumed that one reason can be that some of the coefficients for the logistic regression may not be significant. However, if we exclude them the results are still very similar. The logistic regression produces a lot of mistakes.
 
-Unfortunately, we were not able to resolve this issue in the given time. We still left our analysis in this report and are keen on getting your feedback in it
+Unfortunately, we were not able to resolve this issue in the given time. We still left our analysis in this report and are keen on getting your feedback on it.
 
-#### Predictive machine learning (artificial stupidity)
+
 ```{r setupclassification, echo=TRUE, tidy=TRUE}
-# Please ENTER the class (dependent) variable:
-# Please use numbers, not column names! e.g. 82 uses the 82nd column are dependent variable.
-# YOU NEED TO MAKE SURE THAT THE DEPENDENT VARIABLES TAKES ONLY 2 VALUES: 0 and 1!!!
 
 ProjectDataLeft = ProjectData[,7]
 ProjectDataClass <- cbind(ProjectData2_scaled,ProjectDataLeft)
 dependent_variable= 17
 
-# Please ENTER the attributes to use as independent variables 
 
 independent_variables= c(1:16) 
 
-# Please ENTER the profit/cost values for the correctly and wrong classified data:
-#actual_1_predict_1 = 100
-#actual_1_predict_0 = -75
-#actual_0_predict_1 = -50
-#actual_0_predict_0 = 0
+Probability_Threshold=90 # between 1 and 99%
 
-# Please ENTER the probability threshold above which an observations  
-# is predicted as class 1:
-Probability_Threshold=50 # between 1 and 99%
-
-# Please ENTER the percentage of data used for estimation
 estimation_data_percent = 80
 validation_data_percent = 10
 
-# Please enter 0 if you want to "randomly" split the data in estimation and validation/test
 random_sampling = 0
 
-# Tree parameter
-# PLEASE ENTER THE Tree (CART) complexity control cp (e.g. 0.001 to 0.02, depending on the data)
-CART_cp = 0.001
+CART_cp = 0.01
 
-# Please enter the minimum size of a segment for the analysis to be done only for that segment
-min_segment = 1000
+min_segment = 100
 ```
 
 ```{r}
@@ -726,23 +711,18 @@ if (length(unique(ProjectData[,dependent_variable])) !=2){
   ProjectDataClass[,dependent_variable] <- 1*new_dependent
 }
 
-#Profit_Matrix = matrix(c(actual_1_predict_1, actual_0_predict_1, actual_1_predict_0, actual_0_predict_0), ncol=2)
-#colnames(Profit_Matrix)<- c("Predict 1", "Predict 0")
-#rownames(Profit_Matrix) <- c("Actual 1", "Actual 0")
+
 test_data_percent = 100-estimation_data_percent-validation_data_percent
 CART_control = rpart.control(cp = CART_cp)
 ```
 
 
-We will use two classification trees and logistic regression. You can select "complexity" control for one of the classification trees in the code chunk of the raw .Rmd file here
+We will use two classification trees and logistic regression.
 
 ```{r CART_control, echo=TRUE, tidy=TRUE}
 CART_control = 0.001
 ```
 
-
-
-This is a "small tree" classification for example:
 
 ```{r}
 # FIrst we split the data in estimation, validation, and test
@@ -765,7 +745,7 @@ test_data=ProjectDataClass[test_data_ids,]
 ```
 
 ```{r}
-# just name the variables numerically so that they look ok on the tree plots
+# we name the variables numerically so that they look well on the tree plots
 independent_variables_nolabel = paste("IV", 1:length(independent_variables), sep="")
 
 estimation_data_nolabel = cbind(estimation_data[,dependent_variable], estimation_data[,independent_variables])
@@ -784,21 +764,26 @@ test_data_nolabel = data.frame(test_data_nolabel)
 estimation_data = data.frame(estimation_data)
 validation_data = data.frame(validation_data)
 test_data = data.frame(test_data)
-```
 
-```{r}
 formula=paste(colnames(estimation_data)[dependent_variable],paste(Reduce(paste,sapply(head(independent_variables_nolabel,-1), function(i) paste(i,"+",sep=""))),tail(independent_variables_nolabel,1),sep=""),sep="~")
 CART_tree<-rpart(formula, data= estimation_data_nolabel,method="class", control=CART_control)
 
 rpart.plot(CART_tree, box.palette="OrBu", type=3, extra=1, fallen.leaves=F, branch.lty=3)
 ```
 
-```{r}
-CART_tree_large<-rpart(formula, data= estimation_data_nolabel,method="class", control=rpart.control(cp = 0.005))
-```
+Based on our "small tree" we can make several observation regarding the churn of our employees. If a person has a very low satisfaction level of below and has a high number of projects he will most likely leave. If a person has a high level of satisfaction and spend little time at the company he is unlikely to leave.
+
+Let's look at the larger tree by changing the tree's complexity control parameter. For example, this is how the tree would look like if we set `cp = 0.001`:
 
 ```{r}
-# Let's first calculate all probabilites for the estimation, validation, and test data
+CART_tree_large<-rpart(formula, data= estimation_data_nolabel,method="class", control=rpart.control(cp = 0.001))
+rpart.plot(CART_tree_large, box.palette="OrBu", type=3, extra=1, fallen.leaves=F, branch.lty=3)
+```
+
+The purity of the leaf indicates the probability an observation which "reaches that leaf" belongs to a class. In our case, the probability of the employee leaving for the first few validation data observations, using the first CART above, is:
+
+```{r}
+
 estimation_Probability_class1_tree<-predict(CART_tree, estimation_data_nolabel)[,2]
 estimation_Probability_class1_tree_large<-predict(CART_tree_large, estimation_data_nolabel)[,2]
 
@@ -808,7 +793,6 @@ validation_Probability_class1_tree_large<-predict(CART_tree_large, validation_da
 test_Probability_class1_tree<-predict(CART_tree, test_data_nolabel)[,2]
 test_Probability_class1_tree_large<-predict(CART_tree_large, test_data_nolabel)[,2]
 
-
 estimation_prediction_class_tree=1*as.vector(estimation_Probability_class1_tree > Probability_Threshold)
 estimation_prediction_class_tree_large=1*as.vector(estimation_Probability_class1_tree_large > Probability_Threshold)
 
@@ -817,17 +801,33 @@ validation_prediction_class_tree_large=1*as.vector(validation_Probability_class1
 
 test_prediction_class_tree=1*as.vector(test_Probability_class1_tree > Probability_Threshold)
 test_prediction_class_tree_large=1*as.vector(test_Probability_class1_tree_large > Probability_Threshold)
+
+Classification_Table=rbind(validation_data[,dependent_variable],validation_Probability_class1_tree)
+rownames(Classification_Table)<-c("Actual Class","Probability of Class 1")
+colnames(Classification_Table)<- paste("Obs", 1:ncol(Classification_Table), sep=" ")
+
+Classification_Table_large=rbind(validation_data[,dependent_variable],validation_Probability_class1_tree)
+rownames(Classification_Table_large)<-c("Actual Class","Probability of Class 1")
+colnames(Classification_Table_large)<- paste("Obs", 1:ncol(Classification_Table_large), sep=" ")
+
+knitr::kable(head(t(round(Classification_Table,2)), max_data_report))
 ```
+
+We would like to perform a classification analysis using logistic regression. This is the logistic regression parameters for our data:
 
 ```{r}
 formula_log=paste(colnames(estimation_data[,dependent_variable,drop=F]),paste(Reduce(paste,sapply(head(independent_variables,-1), function(i) paste(colnames(estimation_data)[i],"+",sep=""))),colnames(estimation_data)[tail(independent_variables,1)],sep=""),sep="~")
 
 logreg_solution <- glm(formula_log, family=binomial(link="logit"),  data=estimation_data)
+log_coefficients <- round(summary(logreg_solution)$coefficients,1)
 
-log_coefficients = round(summary(logreg_solution)$coefficients,1)
+knitr::kable(round(log_coefficients,2))
 ```
 
+The probability our validation data belong to class 1 (the employee leaves) for the first few validation data observations, using the logistic regression above, is:
+
 ```{r}
+# Let's get the probabilities for the 3 types of data again
 estimation_Probability_class1_log<-predict(logreg_solution, type="response", newdata=estimation_data[,independent_variables])
 validation_Probability_class1_log<-predict(logreg_solution, type="response", newdata=validation_data[,independent_variables])
 test_Probability_class1_log<-predict(logreg_solution, type="response", newdata=test_data[,independent_variables])
@@ -835,11 +835,18 @@ test_Probability_class1_log<-predict(logreg_solution, type="response", newdata=t
 estimation_prediction_class_log=1*as.vector(estimation_Probability_class1_log > Probability_Threshold)
 validation_prediction_class_log=1*as.vector(validation_Probability_class1_log > Probability_Threshold)
 test_prediction_class_log=1*as.vector(test_Probability_class1_log > Probability_Threshold)
+
+Classification_Table=rbind(validation_data[,dependent_variable],validation_Probability_class1_log)
+rownames(Classification_Table)<-c("Actual Class","Probability of Class 1")
+colnames(Classification_Table)<- paste("Obs", 1:ncol(Classification_Table), sep=" ")
+
+knitr::kable(head(t(round(Classification_Table,2)), max_data_report))
 ```
 
-After also running the large tree and the logistic regression classifiers, we can then check how much "weight" these three methods put on the different churn drivers:
 
-```{r}
+In our case, we can see the relative importance of the independent variables using the `variable.importance` of the CART trees (see `help(rpart.object)` in R) or the z-scores from the output of logistic regression. For easier visualization, we scale all values between -1 and 1. From this table we can see the key drivers of the classification according to each of the methods we used here which are: last evaluation, average monthly hours, time spent and company.
+
+```{r echo=FALSE, comment=NA, warning=FALSE, message=FALSE, results='asis'}
 log_importance = tail(log_coefficients[,"z value", drop=F],-1) # remove the intercept
 log_importance = log_importance/max(abs(log_importance))
 
@@ -860,21 +867,20 @@ large_tree_importance_final <- large_tree_importance_final*sign(log_importance)
 Importance_table <- cbind(tree_importance_final,large_tree_importance_final, log_importance)
 colnames(Importance_table) <- c("CART 1", "CART 2", "Logistic Regr.")
 rownames(Importance_table) <- rownames(log_importance)
-
-iprint.df(Importance_table)
+## printing the result in a clean-slate table
+knitr::kable(round(Importance_table,2))
 ```
 
 
-##Validation accuracy 
+## Validation accuracy 
 
-Using the predicted class probabilities  of the validation data, as outlined above, we can  generate four basic measures of classification performance. Before discussing them, note that given the probability an observation belongs to a class, **a reasonable class prediction choice is to predict the class that has the highest probability**. However, this does not need to be the only choice in practice.
 
-> Selecting the probability threshold based on which we predict the class of an observation is a decision the user needs to make. While in some cases a reasonable probability threshold is 50%, in other cases it may be 99.9% or 0.01%. Can you think of such cases?
+We might suggest to select a relatively high probability threshold (>90%) because it is important for us only to focus on those employee that are almost certain to leave. Imagine that we would want to grant additional benefits only to the employees who are most likely to leave disregarding the "likely, but not so much".
 
-For different choices of the probability threshold, one can measure a number of classification performance metrics, which are outlined next. 
+We now measure other classification performance metric for different choices of the probability threshold.
 
-#### 1.  Hit ratio
-This is simply the percentage of the observations that have been correctly classified (the predicted is the same as the actual class). We can just count the number of the (first) validation data correctly classified and divide this number with the total number of the (fist) validation data, using the two CART and the logistic regression above. These are as follows for the probability threshold  `r Probability_Threshold*100`% for the validation data:
+### 1.  Hit ratio
+We calculate the percentage of the observations that have been correctly classified. These are as follows for the probability threshold  `r Probability_Threshold*100`% for the validation data:
 
 ```{r}
 validation_actual=validation_data[,dependent_variable]
@@ -907,11 +913,11 @@ rownames(estimation_hit_rates) <- c("First CART", "Second CART", "Logistic Regre
 knitr::kable(estimation_hit_rates)
 ```
 
-**Why are the performances on the estimation and validation data different? How different can they possibly be? What does this diffference depend on?** Is the Validation Data Hit Rate satisfactory? Which classifier should we use? What should be the benchmark against which to compare the hit rate? 
+We see that for the estimation data the hit rates are much higher than for the validation data. 
 
-A simple benchmark to compare the performance of a classification model against is the **Maximum Chance Criterion**. This measures the proportion of the class with the largest size. For our validation data the largest group is people who do not intent do purchase a boat: `r sum(!validation_actual)` out of `r length(validation_actual)` people). Clearly without doing any discriminant analysis, if we classified all individuals into the largest group,  we could get a hit-rate of `r round(100*sum(!validation_actual)/length(validation_actual), 2)`% - without doing any work. One should have a hit rate of at least as much as the the Maximum Chance Criterion rate, although as we discuss next there are more performance criteria to consider. 
+To compare the performance of a classification model we use the Maximum Chance Criterion. This measures the proportion of the class with the largest size. For our validation data the largest group is people who do leave: `r sum(!validation_actual)` out of `r length(validation_actual)` people). Clearly without doing any discriminant analysis, if we classified all individuals into the largest group,  we could get a hit-rate of `r round(100*sum(!validation_actual)/length(validation_actual), 2)`%. 
 
-#### 2. Confusion matrix
+### 2. Confusion matrix
 
 The confusion matrix shows for each class the number (or percentage) of the  data that are correctly classified for that class. For example for the method above with the highest hit rate in the validation data (among logistic regression and the 2 CART models), the confusion matrix for the validation data is:
 
@@ -929,13 +935,10 @@ rownames(conf_matrix) <- c("Actual 1", "Actual 0")
 knitr::kable(conf_matrix)
 ```
 
-Note that the percentages add up to 100% for each row: can you see why? Moreover, a "good" confusion matrix should have large diagonal values and small off-diagonal oens: you see why?
+*Type 1 error seems extremely high. Even when we reran the model adjusting the variables and features, the Type 1 error remained significant. This makes us believe that the model is not working properly hence we cannot trust the result of this analysis.*
 
-#### 3. ROC curve
+### 3. ROC curve
 
-Remember that each observation is classified by our model according to the probabilities Pr(0) and Pr(1) and a chosen probability threshold. Typically we set the probability threshold to 0.5 - so that observations for which Pr(1) > 0.5 are classified as 1's. However, we can vary this threshold, for example if we are interested in correctly predicting all 1's but do not mind missing some 0's (and vice-versa) - can you think of such a scenario? 
-
-When we change the probability threshold we get different values of hit rate, false positive and false negative rates, or any other performance metric. We can plot for example how the false positive versus true posititive rates change as we alter the probability threshold,  and generate the so called ROC curve. 
 
 The ROC curves for the validation data for both the CARTs above as well as the logistic regression are as follows:
 
@@ -971,11 +974,10 @@ df.all <- do.call(rbind, lapply(list(df1, df2, df3), function(df) {
 ggplot(df.all, aes(x=`False Positive rate`, y=value, colour=variable)) + geom_line() + ylab("True Positive rate")
 ```
 
-How should a good ROC curve look like? A rule of thumb in assessing ROC curves is that the "higher" the curve, hence the larger the area under the curve, the better. You may also select one point on the ROC curve (the "best one" for our purpose) and use that false positive/false negative performances (and corresponding threshold for P(0)) to assess your model. **Which point on the ROC should we select?**
+The best point of the ROC curve is around 80-90% True Positive rate
 
-#### 4. Lift curve
+### 4. Lift curve
 
-By changing the probability threshold, we can also generate the so called lift curve, which is useful for certain applications e.g. in marketing or credit risk. For example, consider the case of capturing fraud by examining only a few transactions instead of every single one of them. In this case we may want to examine as few transactions as possible and capture the maximum number of frauds possible. We can measure the percentage of all frauds we capture if we only examine, say, x% of cases (the top x% in terms of Probability(fraud)). If we plot these points [percentage of class 1 captured vs percentage of all data examined] while we change the threshold, we get a curve that is called the **lift curve**. 
 
 The Lift curves for the validation data for our three classifiers are the following:
 
@@ -1034,15 +1036,18 @@ df.all <- do.call(rbind, lapply(list(frame1, frame2, frame3), function(df) {
 ggplot(df.all, aes(x=`Percent of validation data`, y=value, colour=variable)) + geom_line() + ylab("Percent of class 1")
 ```
 
-How should a good Lift Curve look like? Notice that if we were to randomly examine transactions, **the "random prediction" lift curve would be a 45 degrees straight diagonal line** (why?)! So the further **above** this 45 degrees line our Lift curve is, the better the "lift". Moreover, much like for the ROC curve, one can select the probability threshold appropriately so that any point of the lift curve is selected. **Which point on the lift curve should we select in practice?** 
+The lift curve shows us that the results of the analysis don't change a lot after 50% of the validation data.
+
+The lift and the ROC curve results do not seem accurate. This supports our belief that the model doesn't work correctly thus the results should not be taken into consideration.
 
 
+## Test Accuracy
 
-#### Step 6: Test Accuracy
+We now perform the analysis with the test sample. We assume that the data used for this performance analysis is representative.
 
-Having iterated steps 2-5 until we are satisfyed with the performance of our selected model on the validation data, in this step the performance analysis outlined in step 5 needs to be done with the test sample. This is the performance that "best mimics" what one should expect in practice upon deployment of the classification solution, **assuming (as always) that the data used for this performance analysis are representative of the situation in which the solution will be deployed.** 
+*As can be observed in this section, the results of the test data are in line with those found for the validation data. This confirms our believe that there is a problem with the CART and logistic regression performed and that the results therefore should not be used at this point.*
 
-Let's see in our case how the **Confusion Matrix, ROC Curve, Lift Curve, and Profit Curve** look like for our test data. **Will the performance in the test data be similar to the performance in the  validation data above? More important: should we expect the performance of our classification model to be close to that in our test data when we deploy the model in practice? Why or why not? What should we do if they are different?**
+The Confusion Matrix, ROC Curve, Lift Curve, and Profit Curve look like for our test data:
 
 ```{r}
 ######for train data#####
@@ -1076,6 +1081,7 @@ colnames(conf_matrix) <- c("Predicted 1", "Predicted 0")
 rownames(conf_matrix) <- c("Actual 1", "Actual 0")
 knitr::kable(conf_matrix)
 ```
+
 
 ROC curves for the test data:
 
@@ -1159,13 +1165,13 @@ ggplot(df.all, aes(x=`Percent of test data`, y=value, colour=variable)) + geom_l
 
 
 ## Executive summary and final conclusions
-We entered this analysis with the goal of understanding what the main drivers for employee churn are. Starting from the raW GOLDHR data set, we first conducted descriptive statistics and created a general correlation matrix to get a better understanding of the data that we were dealing with.
+We entered this analysis with the goal of understanding what the main drivers for employee churn are. Starting from the raw GOLDHR data set, we first conducted descriptive statistics and created a general correlation matrix to get a better understanding of the data that we were dealing with.
 <br><br>
 Once we were comfortable with the data, we discovered the most important components of this data (i.e., satisfaction level, amount of work, tenure), and reduced the dimensions of the data set to these important components.
 <br><br> 
 From there we were able to arrive at three distinct segments: Fresh and Happy, who comprise a vast majority of the population and are satisfied with their current standing; Overworked employees who have too many projects and are unhappy about it; and the Unchallenged employees whose workload is disproportionately lax and are unhappy about it. These latter two segments comprise the vast majority of churned employees.
 <br><br>
-In sum, we conclude that by and large the most significant factor that drives employee churn is whether that person is happy or not in the company. Though this my seem obvious, what we found striking about our analysis was how little the other factors contributed to churn relative to employee satisfaction. For example, at first blush we hypothesized that salary might be a major factor for leaving and that emloyees could be segmented by choosing the importance of salary as a factor. However, salary turned out to be eqully important across different segments of employees. Furthermore, we discovered that an employee's satisfaction has very little to do with what department he or she belongs to. Yes, workload was a factor, but paled in comparison to happiness as a whole.
+In sum, we conclude that the most significant factor that drives employee churn is whether that person is happy or not in the company. Though this may seem obvious, what we found striking about our analysis was how little the other factors contributed to churn relative to employee satisfaction. For example, at first blush we hypothesized that salary might be a major factor for leaving and that emloyees could be segmented by choosing the importance of salary as a factor. However, salary turned out to be equally important across different segments of employees. Furthermore, we discovered that an employee's satisfaction has very little to do with the department he or she belongs to.
 <br><br> 
 In this light, we believe the next step for this case is clear. We already know that satisfaction drives retention, so it only makes sense that we have to understand in more detail what drives satisfaction. To do so, we would recommend re-running a similar analysis as above, this time omitting "left" from the study, and instead using "satisfaction_level" as the new dependent variable. We already have some proclivities to what the results may show, as the correlation matrix above shows that projects, tenure, and hours have a high correlation coefficient with satisfaction. Still, it would behoove us to confirm this hypothesis by properly going through the same process we conducted above.
 <br><br> 
