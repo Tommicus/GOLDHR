@@ -11,16 +11,15 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r echo=FALSE, message=FALSE}
 #Vanessa:
-##setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
+setwd("C:/Users/Vanessa Seip/Dropbox/Privat/MBA/INSEAD/Academics/P3/Big Data Analytics/RStudio/GOLDHR")
 
 # Artems Computer: 
-setwd("/Users/Chris/Documents/GOLDHR")
+#setwd("/Users/Chris/Documents/GOLDHR")
 ```
 
 ```{r echo=FALSE, message=FALSE}
-#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
-#suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
-suppressWarnings(source("/Users/Chris/Documents/GOLDHR/library.R"))
+suppressWarnings(source("../INSEADANalytics_VSeip/AnalyticsLibraries/library.R")) 
+#suppressWarnings(source("/Users/Chris/Documents/GOLDHR/library.R"))
 
 
 # Package options
@@ -42,6 +41,7 @@ ProjectData_INITIAL <- ProjectData
 Goal
 <br><br>
 We decided to analyse HR data about various metrics related to employees. We took a sample data set from a large American corporation to propose a model to analyze one of the most pressing business problems nowadays: employee turnover. Therefore, our primary goal is understanding the drivers of turnover - why do people leave the company?
+<br><br>
 
 #### Data set
 <br>Load the data from Kaggle.com regarding HR analytics in a major US company
@@ -229,8 +229,6 @@ Rotated_Factors <- Rotated_Factors[sorted_rows,]
 
 iprint.df(Rotated_Factors, scale=TRUE)
 ```
-
-We see that we do not need to perform the PCA, hence we will use all of the variables in our analysis
 
 ## Segmentation
 <br>
@@ -520,7 +518,7 @@ ProjectData_SegmentPcts = newintermediatetable[,c(1,2,12:20)]
 
 iprint.df(round(ProjectData_SegmentPcts, 2))
 ```
-The next two tables limit the number of employees in each segment to those who left the company. We see that 50% of the employees, the "Fresh&Happy" Segment, shows a very low turn rate, while the turnrate is high for the other two segments (please note that the "Fresh&Happy" Segment could be partially biased because employees are rather new in the company and consequently did not have too much time to leave yet.) The "Overworked" Segment shows the highest turnrate.
+The next two tables limit the number of employees in each segment to those who left the company. We see that the majority of the employees, the "Fresh&Happy" Segment, shows a very low turn rate, while the turn rate is high for the other two segments (please note that the "Fresh&Happy" Segment could be partially biased because employees are rather new in the company and consequently did not have too much time to leave yet.) The "Overworked" Segment shows the highest turnrate.
 ```{r echo=TRUE, tidy=TRUE}
 
 resultstable = NULL
@@ -620,7 +618,7 @@ iprint.df(round(ProjectData_SegmentChurnStats, 1))
 ```
 The summary table below shows the segment, the total number of employees that where grouped into this segment, the segment size compared to the total number of employees in the company (int the database), the number of people who left the company and the the churn rate calculated by people who left devided by the total number of people in this segment.
 <br><br>
-As mentioned above, when implementing measures to decrease the company's churn rate, one should not focus too much on the "Fresh&Happy" Segment, while being very concerned about the other two segments, which show rates close to or above 50%.
+As mentioned above, when implementing measures to decrease the company's churn rate, one should not focus too much on the "Fresh&Happy" Segment, while being very concerned about the other two segments, which show high rates.
 ```{r echo=TRUE, tidy=TRUE}
 
 newintermediatetable= cbind(ProjectData_SegmentStats,ProjectData_SegmentChurnStats[,3:11])
@@ -660,6 +658,20 @@ iprint.df(round(ProjectData_SegmentSummary, 2))
 
 
 ## Classification
+
+####Note on classification analysis below:
+We used the code from the course website, adjusting for our data set and our problem
+
+The CART1, CART2 and Logistic Regr. return a -1.00 in the variable importance for the first independent variable (Satisfaction level in our base case) in the set (we tried multiple independent variables)
+
+The confusion matrix (validation) returns a huge Type 1 error (99.58%) (people staying although we predicted them to leave) but a relatively small Type 2 error (8.43%). If we increase the probability threshold, the Type 1 error doesn’t decrease which is counter intuitive.
+
+For the Test Accuracy confusion matrix the result is pretty much the same.
+
+We assumed that one reason can be that some of the coefficients for the logistic regression may not be significant. If we exclude them the results are still very similar. The logistic regression produces a lot of mistakes.
+
+Unfortunately, we were not able to resolve this issue in the given time. We still left our analysis in this report and are keen on getting your feedback in it
+
 #### Predictive machine learning (artificial stupidity)
 ```{r setupclassification, echo=TRUE, tidy=TRUE}
 # Please ENTER the class (dependent) variable:
@@ -1151,11 +1163,14 @@ We entered this analysis with the goal of understanding what the main drivers fo
 <br><br>
 Once we were comfortable with the data, we discovered the most important components of this data (i.e., satisfaction level, amount of work, tenure), and reduced the dimensions of the data set to these important components.
 <br><br> 
-From there we were able to arrive at three distinct segments: Fresh and Happy, who comprise a vast majority of the population and are satisfied with their current standing; Overworked employees who have too many projects and are unhappy about it; and the Unchallenged employees whose workload is disproportionately lax and are unhappy about it. These latter two segments comprise 98% of churned employees.
+From there we were able to arrive at three distinct segments: Fresh and Happy, who comprise a vast majority of the population and are satisfied with their current standing; Overworked employees who have too many projects and are unhappy about it; and the Unchallenged employees whose workload is disproportionately lax and are unhappy about it. These latter two segments comprise the vast majority of churned employees.
 <br><br>
-In sum, we conclude that by and large the most significant factor that drives employee churn is whether that person is happy or not in the company. Though this my seem obvious, what we found striking about our analysis was how little the other factors contributed to churn relative to employee satisfaction. For example, at first blush we hypothesized that salary might be a major factor for leaving, but employees were quite indifferent to it. Furthermore, we discovered that an employee's satisfaction has very little to do with what department he or she belongs to. Yes, workload was a factor, but paled in comparison to happiness as a whole.
+In sum, we conclude that by and large the most significant factor that drives employee churn is whether that person is happy or not in the company. Though this my seem obvious, what we found striking about our analysis was how little the other factors contributed to churn relative to employee satisfaction. For example, at first blush we hypothesized that salary might be a major factor for leaving and that emloyees could be segmented by choosing the importance of salary as a factor. However, salary turned out to be eqully important across different segments of employees. Furthermore, we discovered that an employee's satisfaction has very little to do with what department he or she belongs to. Yes, workload was a factor, but paled in comparison to happiness as a whole.
 <br><br> 
 In this light, we believe the next step for this case is clear. We already know that satisfaction drives retention, so it only makes sense that we have to understand in more detail what drives satisfaction. To do so, we would recommend re-running a similar analysis as above, this time omitting "left" from the study, and instead using "satisfaction_level" as the new dependent variable. We already have some proclivities to what the results may show, as the correlation matrix above shows that projects, tenure, and hours have a high correlation coefficient with satisfaction. Still, it would behoove us to confirm this hypothesis by properly going through the same process we conducted above.
+<br><br> 
+Note. We're not summarizing the results of the classification at this point due to the issues mentioned above.
+
 =======
 
 
